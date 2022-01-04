@@ -63,6 +63,7 @@ end
 ---@param args NeotestRunArgs
 ---@return NeotestRunSpec
 function PythonNeotestAdapter.build_spec(args)
+  local position = args.tree:data()
 	local results_path = vim.fn.tempname()
 	local runner = get_runner()
 	local python = base.get_python_command(vim.fn.getcwd())
@@ -72,11 +73,10 @@ function PythonNeotestAdapter.build_spec(args)
 		"--runner",
 		runner,
 		"--",
-		get_args(runner, args.position),
+		get_args(runner, position),
 	})
-	if args.position then
-		local pos = args.position
-		table.insert(script_args, pos.id)
+	if position then
+		table.insert(script_args, position.id)
 	end
 	local command = vim.tbl_flatten({
 		python,
