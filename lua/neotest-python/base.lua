@@ -47,17 +47,17 @@ function M.parse_positions(file_path)
 	return lib.treesitter.parse_positions(file_path, query)
 end
 
-function M.get_strategy_config(strategy, python, python_script, args)
+function M.get_strategy_config(strategy, python_script, args)
 	local config = {
 		dap = function()
 			return {
 				type = "python",
 				name = "Neotest Debugger",
 				request = "launch",
-				python = python,
 				program = python_script,
 				cwd = vim.fn.getcwd(),
 				args = args,
+        justMyCode= false,
 			}
 		end,
 	}

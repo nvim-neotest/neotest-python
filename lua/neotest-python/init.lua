@@ -84,7 +84,7 @@ function PythonNeotestAdapter.build_spec(args)
     context = {
       results_path = results_path,
     },
-    strategy = base.get_strategy_config(args.strategy, python, python_script, script_args),
+    strategy = base.get_strategy_config(args.strategy, python_script, script_args),
   }
 end
 
@@ -125,3 +125,4 @@ setmetatable(PythonNeotestAdapter, {
 })
 
 return PythonNeotestAdapter
+
