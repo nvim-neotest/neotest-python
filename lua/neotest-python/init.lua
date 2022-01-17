@@ -34,6 +34,8 @@ end
 ---@type NeotestAdapter
 local PythonNeotestAdapter = { name = "neotest-python" }
 
+PythonNeotestAdapter.root = lib.files.match_root_pattern("pyproject.toml", "setup.cfg", "mypy.ini", "pytest.ini", "setup.py")
+
 function PythonNeotestAdapter.is_test_file(file_path)
   return base.is_test_file(file_path)
 end
@@ -125,4 +127,3 @@ setmetatable(PythonNeotestAdapter, {
 })
 
 return PythonNeotestAdapter
-
