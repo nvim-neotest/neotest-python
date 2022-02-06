@@ -76,14 +76,6 @@ class UnittestNeotestAdapter(NeotestAdapter):
                             "short": None,
                         },
                     )
-                    results[case_file] = self.update_result(
-                        results.get(case_file),
-                        {
-                            "status": NeotestResultStatus.FAILED,
-                            "errors": [{"message": message, "line": error_line}],
-                            "short": None,
-                        },
-                    )
                 for case, message in result.skipped:
                     results[self.case_id(case)] = self.update_result(
                         results[self.case_id(case)],

@@ -1,4 +1,4 @@
-local logger = require("neotest.logging")
+local async = require("plenary.async")
 local Path = require("plenary.path")
 local lib = require("neotest.lib")
 local base = require("neotest-python.base")
@@ -17,7 +17,13 @@ local get_args = function(runner, position)
   return lib.vim_test.collect_args("python", runner, position)
 end
 
-local get_runner = function()
+local stored_runners = {}
+
+local get_runner = function(python_command)
+  local command_str = table.concat(python_command, " ")
+  if stored_runners[command_str] then
+    return stored_runners[command_str]
+  end
   local vim_test_runner = vim.g["test#python#runner"]
   if vim_test_runner == "pyunit" then
     return "unittest"
@@ -25,16 +31,21 @@ local get_runner = function()
   if vim_test_runner and lib.func_util.index({ "unittest", "pytest" }, vim_test_runner) then
     return vim_test_runner
   end
-  if vim.fn.executable("pytest") == 1 then
-    return "pytest"
-  end
-  return "unittest"
+  local runner = base.module_exists("pytest", python_command) and "pytest" or "unittest"
+  stored_runners[command_str] = runner
+  return runner
 end
 
 ---@type NeotestAdapter
 local PythonNeotestAdapter = { name = "neotest-python" }
 
-PythonNeotestAdapter.root = lib.files.match_root_pattern("pyproject.toml", "setup.cfg", "mypy.ini", "pytest.ini", "setup.py")
+PythonNeotestAdapter.root = lib.files.match_root_pattern(
+  "pyproject.toml",
+  "setup.cfg",
+  "mypy.ini",
+  "pytest.ini",
+  "setup.py"
+)
 
 function PythonNeotestAdapter.is_test_file(file_path)
   return base.is_test_file(file_path)
@@ -53,18 +64,23 @@ function PythonNeotestAdapter.discover_positions(path)
      name: (identifier) @namespace.name)
      @namespace.definition
   ]]
+  local root = PythonNeotestAdapter.root(path)
+  local python = base.get_python_command(root)
+  local runner = get_runner(python)
   return lib.treesitter.parse_positions(path, query, {
-    require_namespaces = get_runner() == "unittest",
+    require_namespaces = runner == "unittest",
   })
 end
 
+---@async
 ---@param args NeotestRunArgs
 ---@return NeotestRunSpec
 function PythonNeotestAdapter.build_spec(args)
   local position = args.tree:data()
-  local results_path = vim.fn.tempname()
-  local runner = get_runner()
-  local python = base.get_python_command(vim.fn.getcwd())
+  local results_path = async.fn.tempname()
+  local root = PythonNeotestAdapter.root(position.path)
+  local python = base.get_python_command(root)
+  local runner = get_runner(python)
   local script_args = vim.tbl_flatten({
     "--results-file",
     results_path,
@@ -86,7 +102,7 @@ function PythonNeotestAdapter.build_spec(args)
     context = {
       results_path = results_path,
     },
-    strategy = base.get_strategy_config(args.strategy, python_script, script_args),
+    strategy = base.get_strategy_config(args.strategy, python, python_script, script_args),
   }
 end
 

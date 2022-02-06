@@ -76,19 +76,8 @@ class PytestNeotestAdapter(NeotestAdapter):
                         "errors": errors,
                     },
                 )
-                results[abs_path] = self.update_result(
-                    results.get(abs_path),
-                    {
-                        "short": None,
-                        "status": NeotestResultStatus(report.outcome),
-                        "errors": errors,
-                    },
-                )
 
         import pytest
 
         pytest.main(args=args, plugins=[NeotestResultCollector])
         return results
-
-    def update_report(self, report: Optional[Dict], update: Dict):
-        ...
