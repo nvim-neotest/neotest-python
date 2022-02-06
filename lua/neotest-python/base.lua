@@ -17,7 +17,7 @@ M.module_exists = function(module, python_command)
   return lib.process.run(vim.tbl_flatten({
     python_command,
     "-c",
-    "import imp; imp.find_module('"..module.."')",
+    "import imp; imp.find_module('" .. module .. "')",
   })) == 0
 end
 
@@ -56,25 +56,4 @@ function M.parse_positions(file_path)
   return lib.treesitter.parse_positions(file_path, query)
 end
 
-function M.get_strategy_config(strategy, python, python_script, args)
-	local config = {
-		dap = function()
-			return {
-				type = "python",
-				name = "Neotest Debugger",
-				request = "launch",
-        python = python,
-				program = python_script,
-				cwd = async.fn.getcwd(),
-				args = args,
-        justMyCode= false,
-			}
-		end,
-	}
-	if config[strategy] then
-		return config[strategy]()
-	end
-end
-
 return M
-

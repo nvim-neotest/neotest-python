@@ -10,6 +10,27 @@ end
 
 local python_script = (Path.new(script_path()):parent():parent() / "neotest.py").filename
 
+local dap_args
+
+local function get_strategy_config(strategy, python, python_script, args)
+  local config = {
+    dap = function()
+      return vim.tbl_extend("keep", {
+        type = "python",
+        name = "Neotest Debugger",
+        request = "launch",
+        python = python,
+        program = python_script,
+        cwd = async.fn.getcwd(),
+        args = args,
+      }, dap_args or {})
+    end,
+  }
+  if config[strategy] then
+    return config[strategy]()
+  end
+end
+
 local get_args = function(runner, position)
   if runner == "unittest" then
     runner = "pyunit"
@@ -97,12 +118,18 @@ function PythonNeotestAdapter.build_spec(args)
     python_script,
     script_args,
   })
+  local strategy_config = get_strategy_config(
+    args.strategy,
+    python,
+    python_script,
+    script_args
+  )
   return {
     command = command,
     context = {
       results_path = results_path,
     },
-    strategy = base.get_strategy_config(args.strategy, python, python_script, script_args),
+    strategy = strategy_config,
   }
 end
 
@@ -111,16 +138,20 @@ end
 ---@param result NeotestStrategyResult
 ---@return NeotestResult[]
 function PythonNeotestAdapter.results(spec, result)
-  -- TODO: Find out if this JSON option is supported in future
   local success, data = pcall(lib.files.read, spec.context.results_path)
   if not success then
     data = "{}"
   end
+  -- TODO: Find out if this JSON option is supported in future
   local results = vim.json.decode(data, { luanil = { object = true } })
   for _, pos_result in pairs(results) do
     result.output_path = pos_result.output_path
   end
   return results
+end
+
+local is_callable = function(obj)
+  return type(obj) == "function" or (type(obj) == "table" and obj.__call)
 end
 
 setmetatable(PythonNeotestAdapter, {
@@ -132,13 +163,17 @@ setmetatable(PythonNeotestAdapter, {
         return opts.args
       end
     end
-    if type(opts.runner) == "function" or (type(opts.runner) == "table" and opts.runner.__call) then
+    if is_callable(opts.runner) then
       get_runner = opts.runner
     elseif opts.runner then
       get_runner = function()
         return opts.runner
       end
     end
+    if type(opts.dap) == "table" then
+      dap_args = opts.dap
+    end
+    return PythonNeotestAdapter
   end,
 })
 
