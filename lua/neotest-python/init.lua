@@ -78,7 +78,7 @@ function PythonNeotestAdapter.discover_positions(path)
   local query = [[
     ((function_definition
       name: (identifier) @test.name)
-      (#match? @test.name "^test_"))
+      (#match? @test.name "^test"))
       @test.definition
 
     (class_definition
