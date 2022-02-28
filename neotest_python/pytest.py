@@ -23,6 +23,8 @@ class PytestNeotestAdapter(NeotestAdapter):
         msg = reporter._getfailureheadline(report)
         if report.outcome == NeotestResultStatus.FAILED:
             reporter.write_sep("_", msg, red=True, bold=True)
+        elif report.outcome == NeotestResultStatus.SKIPPED:
+            reporter.write_sep("_", msg, cyan=True, bold=True)
         else:
             reporter.write_sep("_", msg, green=True, bold=True)
         reporter._outrep_summary(report)
