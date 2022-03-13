@@ -12,7 +12,7 @@ local python_script = (Path.new(script_path()):parent():parent() / "neotest.py")
 
 local dap_args
 
-local function get_strategy_config(strategy, python, python_script, args)
+local function get_strategy_config(strategy, python, program, args)
   local config = {
     dap = function()
       return vim.tbl_extend("keep", {
@@ -20,7 +20,7 @@ local function get_strategy_config(strategy, python, python_script, args)
         name = "Neotest Debugger",
         request = "launch",
         python = python,
-        program = python_script,
+        program = program,
         cwd = async.fn.getcwd(),
         args = args,
       }, dap_args or {})
@@ -57,7 +57,7 @@ local get_runner = function(python_command)
   return runner
 end
 
----@type NeotestAdapter
+---@type neotest.Adapter
 local PythonNeotestAdapter = { name = "neotest-python" }
 
 PythonNeotestAdapter.root = lib.files.match_root_pattern(
@@ -94,8 +94,8 @@ function PythonNeotestAdapter.discover_positions(path)
 end
 
 ---@async
----@param args NeotestRunArgs
----@return NeotestRunSpec
+---@param args neotest.RunArgs
+---@return neotest.RunSpec
 function PythonNeotestAdapter.build_spec(args)
   local position = args.tree:data()
   local results_path = async.fn.tempname()
@@ -134,9 +134,9 @@ function PythonNeotestAdapter.build_spec(args)
 end
 
 ---@async
----@param spec NeotestRunSpec
----@param result NeotestStrategyResult
----@return NeotestResult[]
+---@param spec neotest.RunSpec
+---@param result neotest.StrategyResult
+---@return neotest.Result[]
 function PythonNeotestAdapter.results(spec, result)
   local success, data = pcall(lib.files.read, spec.context.results_path)
   if not success then
