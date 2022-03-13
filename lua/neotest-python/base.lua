@@ -1,4 +1,4 @@
-local async = require("plenary.async")
+local async = require("neotest.async")
 local lib = require("neotest.lib")
 local Path = require("plenary.path")
 
