@@ -31,11 +31,8 @@ local function get_strategy_config(strategy, python, program, args)
   end
 end
 
-local get_args = function(runner, position)
-  if runner == "unittest" then
-    runner = "pyunit"
-  end
-  return lib.vim_test.collect_args("python", runner, position)
+local get_args = function()
+  return {}
 end
 
 local stored_runners = {}
