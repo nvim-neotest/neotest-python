@@ -12,6 +12,7 @@ def add_to_path():
     finally:
         sys.path = old_path
 
+
 with add_to_path():
     from neotest_python import main
 
