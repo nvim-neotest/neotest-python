@@ -1,4 +1,6 @@
 import inspect
+import os
+import sys
 import traceback
 import unittest
 from pathlib import Path
@@ -33,6 +35,18 @@ class UnittestNeotestAdapter(NeotestAdapter):
 
     def case_id(self, case: "TestCase | TestSuite") -> str:
         return "::".join(self.case_id_elems(case))
+
+    def id_to_test_specifier(self, case_id: str) -> str:
+        """Converts a neotest ID into test specifier for unittest"""
+        pieces = case_id.split("::")
+        # If the ID is just a filename, return that
+        if len(pieces) == 1:
+            return pieces[0]
+        # Otherwise, convert the ID into a dotted path, relative to current dir
+        relative_file = os.path.relpath(pieces[0], os.getcwd())
+        relative_stem = os.path.splitext(relative_file)[0]
+        relative_dotted = relative_stem.replace(os.sep, ".")
+        return f"{relative_dotted}.{'.'.join(pieces[1:])}"
 
     def run(self, args: List[str]) -> Dict:
         results = {}
@@ -87,9 +101,13 @@ class UnittestNeotestAdapter(NeotestAdapter):
                     )
                 return result
 
+        # Make sure we can import relative to current path
+        sys.path.insert(0, os.getcwd())
+        specs = [self.id_to_test_specifier(case_id) for case_id in args]
+        argv = sys.argv[0:1] + specs
         unittest.main(
             module=None,
-            argv=args,
+            argv=argv,
             testRunner=NeotestUnittestRunner(resultclass=NeotestTextTestResult),
             exit=False,
         )
