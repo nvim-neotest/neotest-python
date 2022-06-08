@@ -10,7 +10,7 @@ function M.is_test_file(file_path)
   end
   local elems = vim.split(file_path, Path.path.sep)
   local file_name = elems[#elems]
-  return vim.startswith(file_name, "test_")
+  return vim.startswith(file_name, "test_") or vim.endswith(file_name, "_test.py")
 end
 
 M.module_exists = function(module, python_command)
@@ -40,20 +40,6 @@ function M.get_python_command(root)
   end
   -- Fallback to system Python.
   return { async.fn.exepath("python3") or async.fn.exepath("python") or "python" }
-end
-
-function M.parse_positions(file_path)
-  local query = [[
-    ((function_definition
-      name: (identifier) @test.name)
-      (#match? @test.name "^test_"))
-      @test.definition
-
-    (class_definition
-     name: (identifier) @namespace.name)
-     @namespace.definition
-  ]]
-  return lib.treesitter.parse_positions(file_path, query)
 end
 
 return M
