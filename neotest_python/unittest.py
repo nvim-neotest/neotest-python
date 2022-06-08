@@ -38,22 +38,19 @@ class UnittestNeotestAdapter(NeotestAdapter):
 
     def id_to_unittest_args(self, case_id: str) -> List[str]:
         """Converts a neotest ID into test specifier for unittest"""
-        pieces = case_id.split("::")
-        # If no ::, then the argument is a filepath
-        if len(pieces) == 1:
-            test_path = pieces[0]
-            if os.path.isfile(test_path):
+        path, *child_ids = case_id.split("::")
+        if not child_ids:
+            if os.path.isfile(path):
                 # Test files can be passed directly to unittest
-                return [test_path]
-            else:
-                # Directories need to be run via the 'discover' argument
-                return ["discover", "-s", test_path]
-        else:
-            # Otherwise, convert the ID into a dotted path, relative to current dir
-            relative_file = os.path.relpath(pieces[0], os.getcwd())
-            relative_stem = os.path.splitext(relative_file)[0]
-            relative_dotted = relative_stem.replace(os.sep, ".")
-            return [f"{relative_dotted}.{'.'.join(pieces[1:])}"]
+                return [path]
+            # Directories need to be run via the 'discover' argument
+            return ["discover", "-s", path]
+
+        # Otherwise, convert the ID into a dotted path, relative to current dir
+        relative_file = os.path.relpath(path, os.getcwd())
+        relative_stem = os.path.splitext(relative_file)[0]
+        relative_dotted = relative_stem.replace(os.sep, ".")
+        return [".".join([relative_dotted, *child_ids])]
 
     def run(self, args: List[str]) -> Dict:
         results = {}
@@ -112,7 +109,6 @@ class UnittestNeotestAdapter(NeotestAdapter):
         sys.path.insert(0, os.getcwd())
         # We only get a single case ID as the argument
         argv = sys.argv[0:1] + self.id_to_unittest_args(args[0])
-        print(argv)
         unittest.main(
             module=None,
             argv=argv,
