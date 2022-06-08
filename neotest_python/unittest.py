@@ -11,16 +11,6 @@ from .base import NeotestAdapter, NeotestResultStatus
 
 
 class UnittestNeotestAdapter(NeotestAdapter):
-    def iter_suite(
-        self, suite: "TestSuite | TestCase"
-    ) -> Iterator["TestCase | TestSuite"]:
-        if isinstance(suite, TestSuite):
-            for sub in suite:
-                for case in self.iter_suite(sub):
-                    yield case
-        else:
-            yield suite
-
     def case_file(self, case) -> str:
         return str(Path(inspect.getmodule(case).__file__).absolute())  # type: ignore
 
@@ -44,19 +34,19 @@ class UnittestNeotestAdapter(NeotestAdapter):
                 errs[self.case_id(test)] = err
                 return super().addFailure(test, err)
 
+            def addError(_, test: TestCase, err) -> None:
+                errs[self.case_id(test)] = err
+                return super().addError(test, err)
+
+            def addSuccess(_, test: TestCase) -> None:
+                results[self.case_id(test)] = {
+                    "status": NeotestResultStatus.PASSED,
+                }
+
         class NeotestUnittestRunner(TextTestRunner):
             def run(_, test: "TestSuite | TestCase") -> "TestResult":  # type: ignore
-                for case in self.iter_suite(test):
-                    results[self.case_id(case)] = {
-                        "status": NeotestResultStatus.PASSED,
-                        "short": None,
-                    }
-                    results[self.case_file(case)] = {
-                        "status": NeotestResultStatus.PASSED,
-                        "short": None,
-                    }
                 result = super().run(test)
-                for case, message in result.failures:
+                for case, message in result.failures + result.errors:
                     case_id = self.case_id(case)
                     error_line = None
                     case_file = self.case_file(case)
@@ -68,23 +58,17 @@ class UnittestNeotestAdapter(NeotestAdapter):
                             for frame in reversed(summary)
                             if frame.filename == case_file
                         )
-                    results[case_id] = self.update_result(
-                        results.get(case_id),
-                        {
-                            "status": NeotestResultStatus.FAILED,
-                            "errors": [{"message": message, "line": error_line}],
-                            "short": None,
-                        },
-                    )
+                    results[case_id] = {
+                        "status": NeotestResultStatus.FAILED,
+                        "errors": [{"message": message, "line": error_line}],
+                        "short": None,
+                    }
                 for case, message in result.skipped:
-                    results[self.case_id(case)] = self.update_result(
-                        results[self.case_id(case)],
-                        {
-                            "short": None,
-                            "status": NeotestResultStatus.SKIPPED,
-                            "errors": None,
-                        },
-                    )
+                    results[self.case_id(case)] = {
+                        "short": None,
+                        "status": NeotestResultStatus.SKIPPED,
+                        "errors": None,
+                    }
                 return result
 
         unittest.main(
