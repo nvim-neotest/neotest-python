@@ -105,7 +105,7 @@ function PythonNeotestAdapter.build_spec(args)
     "--runner",
     runner,
     "--",
-    get_args(runner, position),
+    vim.list_extend(get_args(runner, position), args.extra_args or {}),
   })
   if position then
     table.insert(script_args, position.id)
