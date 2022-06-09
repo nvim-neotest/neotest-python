@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Dict, List, Optional, cast
 from .base import NeotestAdapter, NeotestError, NeotestResult, NeotestResultStatus
 
 if TYPE_CHECKING:
-    from _pytest._code.code import ExceptionChainRepr
     from _pytest.config import Config
     from _pytest.reports import TestReport
 
@@ -36,6 +35,7 @@ class PytestNeotestAdapter(NeotestAdapter):
     def run(self, args: List[str]) -> Dict[str, NeotestResult]:
         results: Dict[str, NeotestResult] = {}
         pytest_config: "Config"
+        from _pytest._code.code import ExceptionChainRepr
 
         class NeotestResultCollector:
             @staticmethod
@@ -57,18 +57,25 @@ class PytestNeotestAdapter(NeotestAdapter):
                 errors: List[NeotestError] = []
                 short = self.get_short_output(pytest_config, report)
                 if report.outcome == "failed":
-                    exc_repr = cast("ExceptionChainRepr", report.longrepr)
-                    exc_repr.toterminal
-                    reprtraceback = exc_repr.reprtraceback
-                    error_message = exc_repr.reprcrash.message  # type: ignore
-                    error_line = None
-                    for repr in reversed(reprtraceback.reprentries):
-                        if (
-                            hasattr(repr, "reprfileloc")
-                            and repr.reprfileloc.path == file_path
-                        ):
-                            error_line = repr.reprfileloc.lineno - 1
-                    errors.append({"message": error_message, "line": error_line})
+                    exc_repr = report.longrepr
+                    # Test fails due to condition outside of test e.g. xfail
+                    if isinstance(exc_repr, str):
+                        errors.append({"message": exc_repr, "line": None})
+                    # Test failed internally
+                    elif isinstance(exc_repr, ExceptionChainRepr):
+                        reprtraceback = exc_repr.reprtraceback
+                        error_message = exc_repr.reprcrash.message  # type: ignore
+                        error_line = None
+                        for repr in reversed(reprtraceback.reprentries):
+                            if (
+                                hasattr(repr, "reprfileloc")
+                                and repr.reprfileloc.path == file_path
+                            ):
+                                error_line = repr.reprfileloc.lineno - 1
+                        errors.append({"message": error_message, "line": error_line})
+                    else:
+                        # TODO: Figure out how these are returned and how to represent
+                        raise Exception("Unhandled error type, please report to neotest-python repo")
                 pos_id = "::".join([abs_path, *namespaces, valid_test_name])
                 results[pos_id] = self.update_result(
                     results.get(pos_id),
