@@ -26,6 +26,12 @@ require("neotest").setup({
         -- Runner to use. Will use pytest if available by default.
         -- Can be a function to return dynamic value.
         runner = "pytest",
+
+        -- Returns if a given file path is a test file.
+        -- NB: This function is called a lot so don't perform any heavy tasks within it.
+        is_test_file = function(file_path)
+          ...
+        end,
         
     })
   }

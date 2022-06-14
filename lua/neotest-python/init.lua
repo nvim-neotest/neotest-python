@@ -11,6 +11,7 @@ end
 local python_script = (Path.new(script_path()):parent():parent() / "neotest.py").filename
 
 local dap_args
+local is_test_file = base.is_test_file
 
 local function get_strategy_config(strategy, python, program, args)
   local config = {
@@ -66,7 +67,7 @@ PythonNeotestAdapter.root = lib.files.match_root_pattern(
 )
 
 function PythonNeotestAdapter.is_test_file(file_path)
-  return base.is_test_file(file_path)
+  return is_test_file(file_path)
 end
 
 ---@async
@@ -115,12 +116,7 @@ function PythonNeotestAdapter.build_spec(args)
     python_script,
     script_args,
   })
-  local strategy_config = get_strategy_config(
-    args.strategy,
-    python,
-    python_script,
-    script_args
-  )
+  local strategy_config = get_strategy_config(args.strategy, python, python_script, script_args)
   return {
     command = command,
     context = {
@@ -153,6 +149,7 @@ end
 
 setmetatable(PythonNeotestAdapter, {
   __call = function(_, opts)
+    is_test_file = opts.is_test_file or is_test_file
     if type(opts.args) == "function" or (type(opts.args) == "table" and opts.args.__call) then
       get_args = opts.args
     elseif opts.args then
