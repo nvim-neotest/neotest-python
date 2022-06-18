@@ -39,7 +39,7 @@ function M.get_python_command(root)
     return { "pipenv", "run", "python" }
   end
   
-  if lib.files.exists("pyproject.toml") then
+  if lib.files.exists("pyproject.toml") and lib.files.exists("poetry.lock") then
     return { "poetry", "run", "python" }
   end
 
