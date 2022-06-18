@@ -38,6 +38,11 @@ function M.get_python_command(root)
   if lib.files.exists("Pipfile") then
     return { "pipenv", "run", "python" }
   end
+  
+  if lib.files.exists("pyproject.toml") then
+    return { "poetry", "run", "python" }
+  end
+
   -- Fallback to system Python.
   return { async.fn.exepath("python3") or async.fn.exepath("python") or "python" }
 end
