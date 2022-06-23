@@ -21,25 +21,50 @@ M.module_exists = function(module, python_command)
   })) == 0
 end
 
+local python_command_mem = {}
+
 ---@return string[]
 function M.get_python_command(root)
+  if python_command_mem[root] then
+    return python_command_mem[root]
+  end
   -- Use activated virtualenv.
   if vim.env.VIRTUAL_ENV then
-    return { Path:new(vim.env.VIRTUAL_ENV, "bin", "python").filename }
+    python_command_mem[root] = { Path:new(vim.env.VIRTUAL_ENV, "bin", "python").filename }
+    return python_command_mem[root]
   end
 
   for _, pattern in ipairs({ "*", ".*" }) do
     local match = async.fn.glob(Path:new(root or async.fn.getcwd(), pattern, "pyvenv.cfg").filename)
     if match ~= "" then
-      return { (Path:new(match):parent() / "bin" / "python").filename }
+      python_command_mem[root] = { (Path:new(match):parent() / "bin" / "python").filename }
+      return python_command_mem[root]
     end
   end
 
   if lib.files.exists("Pipfile") then
-    return { "pipenv", "run", "python" }
+    local _, data = lib.process.run({ "pipenv", "--py" }, { stdout = true })
+    local venv = data.stdout:gsub("\n", "")
+    if venv then
+      python_command_mem[root] = { Path:new(venv).filename }
+      return python_command_mem[root]
+    end
   end
+
+  if lib.files.exists("pyproject.toml") then
+    local _, data = lib.process.run({ "poetry", "env", "info", "-p" }, { stdout = true })
+    local venv = data.stdout:gsub("\n", "")
+    if venv then
+      python_command_mem[root] = { Path:new(venv, "bin", "python").filename }
+      return python_command_mem[root]
+    end
+  end
+
   -- Fallback to system Python.
-  return { async.fn.exepath("python3") or async.fn.exepath("python") or "python" }
+  python_command_mem[root] = {
+    async.fn.exepath("python3") or async.fn.exepath("python") or "python",
+  }
+  return python_command_mem[root]
 end
 
 return M
