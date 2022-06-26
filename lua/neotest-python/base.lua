@@ -25,6 +25,9 @@ local python_command_mem = {}
 
 ---@return string[]
 function M.get_python_command(root)
+  if not root then
+    root = vim.loop.cwd()
+  end
   if python_command_mem[root] then
     return python_command_mem[root]
   end
