@@ -58,13 +58,8 @@ end
 ---@type neotest.Adapter
 local PythonNeotestAdapter = { name = "neotest-python" }
 
-PythonNeotestAdapter.root = lib.files.match_root_pattern(
-  "pyproject.toml",
-  "setup.cfg",
-  "mypy.ini",
-  "pytest.ini",
-  "setup.py"
-)
+PythonNeotestAdapter.root =
+  lib.files.match_root_pattern("pyproject.toml", "setup.cfg", "mypy.ini", "pytest.ini", "setup.py")
 
 function PythonNeotestAdapter.is_test_file(file_path)
   return is_test_file(file_path)

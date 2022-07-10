@@ -46,20 +46,28 @@ function M.get_python_command(root)
   end
 
   if lib.files.exists("Pipfile") then
-    local _, data = lib.process.run({ "pipenv", "--py" }, { stdout = true })
-    local venv = data.stdout:gsub("\n", "")
-    if venv then
-      python_command_mem[root] = { Path:new(venv).filename }
-      return python_command_mem[root]
+    local success, _, data = pcall(lib.process.run, { "pipenv", "--py" }, { stdout = true })
+    if success then
+      local venv = data.stdout:gsub("\n", "")
+      if venv then
+        python_command_mem[root] = { Path:new(venv).filename }
+        return python_command_mem[root]
+      end
     end
   end
 
   if lib.files.exists("pyproject.toml") then
-    local _, data = lib.process.run({ "poetry", "env", "info", "-p" }, { stdout = true })
-    local venv = data.stdout:gsub("\n", "")
-    if venv then
-      python_command_mem[root] = { Path:new(venv, "bin", "python").filename }
-      return python_command_mem[root]
+    local success, _, data = pcall(
+      lib.process.run,
+      { "poetry", "env", "info", "-p" },
+      { stdout = true }
+    )
+    if success then
+      local venv = data.stdout:gsub("\n", "")
+      if venv then
+        python_command_mem[root] = { Path:new(venv, "bin", "python").filename }
+        return python_command_mem[root]
+      end
     end
   end
 
