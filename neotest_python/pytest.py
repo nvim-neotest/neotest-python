@@ -1,6 +1,6 @@
 from io import StringIO
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List, Optional, cast
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional
 
 from .base import NeotestAdapter, NeotestError, NeotestResult, NeotestResultStatus
 
@@ -32,7 +32,9 @@ class PytestNeotestAdapter(NeotestAdapter):
         buffer.seek(0)
         return buffer.read()
 
-    def run(self, args: List[str]) -> Dict[str, NeotestResult]:
+    def run(
+        self, args: List[str], stream: Callable[[str, NeotestResult], None]
+    ) -> Dict[str, NeotestResult]:
         results: Dict[str, NeotestResult] = {}
         pytest_config: "Config"
         from _pytest._code.code import ExceptionChainRepr
@@ -52,7 +54,7 @@ class PytestNeotestAdapter(NeotestAdapter):
                 file_path, *name_path = report.nodeid.split("::")
                 abs_path = str(Path(pytest_config.rootpath, file_path))
                 test_name, *namespaces = reversed(name_path)
-                valid_test_name, *_ = test_name.split("[")  # ]
+                valid_test_name, *params = test_name.split("[")  # ]
 
                 errors: List[NeotestError] = []
                 short = self.get_short_output(pytest_config, report)
@@ -75,9 +77,11 @@ class PytestNeotestAdapter(NeotestAdapter):
                         errors.append({"message": error_message, "line": error_line})
                     else:
                         # TODO: Figure out how these are returned and how to represent
-                        raise Exception("Unhandled error type, please report to neotest-python repo")
+                        raise Exception(
+                            "Unhandled error type, please report to neotest-python repo"
+                        )
                 pos_id = "::".join([abs_path, *namespaces, valid_test_name])
-                results[pos_id] = self.update_result(
+                result = self.update_result(
                     results.get(pos_id),
                     {
                         "short": short,
@@ -85,6 +89,9 @@ class PytestNeotestAdapter(NeotestAdapter):
                         "errors": errors,
                     },
                 )
+                if not params:
+                    stream(pos_id, result)
+                results[pos_id] = result
 
         import pytest
 

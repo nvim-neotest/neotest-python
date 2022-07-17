@@ -5,7 +5,7 @@ import traceback
 import unittest
 from pathlib import Path
 from types import TracebackType
-from typing import Any, Dict, Iterator, List, Tuple
+from typing import Any, Dict, List, Tuple
 from unittest import TestCase, TestResult, TestSuite
 from unittest.runner import TextTestResult, TextTestRunner
 
@@ -42,7 +42,8 @@ class UnittestNeotestAdapter(NeotestAdapter):
         relative_dotted = relative_stem.replace(os.sep, ".")
         return [".".join([relative_dotted, *child_ids])]
 
-    def run(self, args: List[str]) -> Dict:
+    # TODO: Stream results
+    def run(self, args: List[str], _) -> Dict:
         results = {}
 
         errs: Dict[str, Tuple[Exception, Any, TracebackType]] = {}
