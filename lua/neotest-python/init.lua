@@ -92,12 +92,20 @@ end
 function PythonNeotestAdapter.build_spec(args)
   local position = args.tree:data()
   local results_path = async.fn.tempname()
+  local stream_path = async.fn.tempname()
+  local x = io.open(stream_path, "w")
+  x:write("")
+  x:close()
+
   local root = PythonNeotestAdapter.root(position.path)
   local python = base.get_python_command(root)
   local runner = get_runner(python)
+  local stream_data, stop_stream = lib.files.stream_lines(stream_path)
   local script_args = vim.tbl_flatten({
     "--results-file",
     results_path,
+    "--stream-file",
+    stream_path,
     "--runner",
     runner,
     "--",
@@ -112,11 +120,24 @@ function PythonNeotestAdapter.build_spec(args)
     script_args,
   })
   local strategy_config = get_strategy_config(args.strategy, python, python_script, script_args)
+  ---@type neotest.RunSpec
   return {
     command = command,
     context = {
       results_path = results_path,
+      stop_stream = stop_stream,
     },
+    stream = function()
+      return function()
+        local lines = stream_data()
+        local results = {}
+        for _, line in ipairs(lines) do
+          local result = vim.json.decode(line, { luanil = { object = true } })
+          results[result.id] = result.result
+        end
+        return results
+      end
+    end,
     strategy = strategy_config,
   }
 end
@@ -126,6 +147,7 @@ end
 ---@param result neotest.StrategyResult
 ---@return neotest.Result[]
 function PythonNeotestAdapter.results(spec, result)
+  spec.context.stop_stream()
   local success, data = pcall(lib.files.read, spec.context.results_path)
   if not success then
     data = "{}"
