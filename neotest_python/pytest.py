@@ -41,6 +41,26 @@ class PytestNeotestAdapter(NeotestAdapter):
 
         class NeotestResultCollector:
             @staticmethod
+            def pytest_deselected(items: List):
+                for report in items:
+                    file_path, *name_path = report.nodeid.split("::")
+                    abs_path = str(Path(pytest_config.rootpath, file_path))
+                    test_name, *namespaces = reversed(name_path)
+                    valid_test_name, *params = test_name.split("[")  # ]
+                    pos_id = "::".join([abs_path, *namespaces, valid_test_name])
+                    result = self.update_result(
+                        results.get(pos_id),
+                        {
+                            "short": None,
+                            "status": NeotestResultStatus.SKIPPED,
+                            "errors": [],
+                        },
+                    )
+                    if not params:
+                        stream(pos_id, result)
+                    results[pos_id] = result
+
+            @staticmethod
             def pytest_cmdline_main(config: "Config"):
                 nonlocal pytest_config
                 pytest_config = config
@@ -55,6 +75,7 @@ class PytestNeotestAdapter(NeotestAdapter):
                 abs_path = str(Path(pytest_config.rootpath, file_path))
                 test_name, *namespaces = reversed(name_path)
                 valid_test_name, *params = test_name.split("[")  # ]
+                pos_id = "::".join([abs_path, *namespaces, valid_test_name])
 
                 errors: List[NeotestError] = []
                 short = self.get_short_output(pytest_config, report)
@@ -80,7 +101,6 @@ class PytestNeotestAdapter(NeotestAdapter):
                         raise Exception(
                             "Unhandled error type, please report to neotest-python repo"
                         )
-                pos_id = "::".join([abs_path, *namespaces, valid_test_name])
                 result = self.update_result(
                     results.get(pos_id),
                     {
