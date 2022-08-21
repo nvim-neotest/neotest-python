@@ -32,6 +32,13 @@ local function get_strategy_config(strategy, python, program, args)
   end
 end
 
+local get_python = function(root)
+  if not root then
+    root = vim.loop.cwd()
+  end
+  return base.get_python_command(root)
+end
+
 local get_args = function()
   return {}
 end
@@ -79,7 +86,7 @@ function PythonNeotestAdapter.discover_positions(path)
      @namespace.definition
   ]]
   local root = PythonNeotestAdapter.root(path)
-  local python = base.get_python_command(root)
+  local python = get_python(root)
   local runner = get_runner(python)
   return lib.treesitter.parse_positions(path, query, {
     require_namespaces = runner == "unittest",
@@ -98,7 +105,7 @@ function PythonNeotestAdapter.build_spec(args)
   x:close()
 
   local root = PythonNeotestAdapter.root(position.path)
-  local python = base.get_python_command(root)
+  local python = get_python(root)
   local runner = get_runner(python)
   local stream_data, stop_stream = lib.files.stream_lines(stream_path)
   local script_args = vim.tbl_flatten({
@@ -167,7 +174,25 @@ end
 setmetatable(PythonNeotestAdapter, {
   __call = function(_, opts)
     is_test_file = opts.is_test_file or is_test_file
-    if type(opts.args) == "function" or (type(opts.args) == "table" and opts.args.__call) then
+    if opts.python then
+      get_python = function(root)
+        local python = opts.python
+
+        if is_callable(opts.python) then
+          python = opts.python(root)
+        end
+
+        if type(python) == "string" then
+          return { python }
+        end
+        if type(python) == "table" then
+          return python
+        end
+
+        return base.get_python(root)
+      end
+    end
+    if is_callable(opts.args) then
       get_args = opts.args
     elseif opts.args then
       get_args = function()
