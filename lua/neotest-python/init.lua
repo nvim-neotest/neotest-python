@@ -72,6 +72,10 @@ function PythonNeotestAdapter.is_test_file(file_path)
   return is_test_file(file_path)
 end
 
+function PythonNeotestAdapter.filter_dir(name)
+  return name ~= "venv"
+end
+
 ---@async
 ---@return Tree | nil
 function PythonNeotestAdapter.discover_positions(path)
