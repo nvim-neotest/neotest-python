@@ -5,7 +5,7 @@ local base = require("neotest-python.base")
 
 local function script_path()
   local str = debug.getinfo(2, "S").source:sub(2)
-  return str:match("(.*/)")
+  return str:match(("(.*%s)"):format(lib.files.sep))
 end
 
 local python_script = (Path.new(script_path()):parent():parent() / "neotest.py").filename
@@ -66,7 +66,7 @@ end
 local PythonNeotestAdapter = { name = "neotest-python" }
 
 PythonNeotestAdapter.root =
-  lib.files.match_root_pattern("pyproject.toml", "setup.cfg", "mypy.ini", "pytest.ini", "setup.py")
+lib.files.match_root_pattern("pyproject.toml", "setup.cfg", "mypy.ini", "pytest.ini", "setup.py")
 
 function PythonNeotestAdapter.is_test_file(file_path)
   return is_test_file(file_path)
