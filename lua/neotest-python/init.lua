@@ -1,14 +1,17 @@
 local async = require("neotest.async")
-local Path = require("plenary.path")
 local lib = require("neotest.lib")
 local base = require("neotest-python.base")
 
-local function script_path()
-  local str = debug.getinfo(2, "S").source:sub(2)
-  return str:match(("(.*%s)"):format(lib.files.sep))
-end
+local function get_script()
+  local paths = vim.api.nvim_get_runtime_file("neotest.py", true)
+  for _, path in ipairs(paths) do
+    if vim.endswith(path, ("neotest-python%sneotest.py"):format(lib.files.sep)) then
+      return path
+    end
+  end
 
-local python_script = (Path.new(script_path()):parent():parent() / "neotest.py").filename
+  error("neotest.py not found")
+end
 
 local dap_args
 local is_test_file = base.is_test_file
@@ -104,9 +107,7 @@ function PythonNeotestAdapter.build_spec(args)
   local position = args.tree:data()
   local results_path = async.fn.tempname()
   local stream_path = async.fn.tempname()
-  local x = io.open(stream_path, "w")
-  x:write("")
-  x:close()
+  lib.files.write(stream_path, "")
 
   local root = PythonNeotestAdapter.root(position.path)
   local python = get_python(root)
@@ -127,7 +128,7 @@ function PythonNeotestAdapter.build_spec(args)
   end
   local command = vim.tbl_flatten({
     python,
-    python_script,
+    get_script(),
     script_args,
   })
   local strategy_config = get_strategy_config(args.strategy, python, python_script, script_args)
