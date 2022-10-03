@@ -126,9 +126,10 @@ function PythonNeotestAdapter.build_spec(args)
   if position then
     table.insert(script_args, position.id)
   end
+  local python_script = get_script()
   local command = vim.tbl_flatten({
     python,
-    get_script(),
+    python_script,
     script_args,
   })
   local strategy_config = get_strategy_config(args.strategy, python, python_script, script_args)
