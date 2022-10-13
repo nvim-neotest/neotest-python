@@ -43,8 +43,8 @@ function M.get_python_command(root)
   end
 
   if lib.files.exists("Pipfile") then
-    local success, _, data = pcall(lib.process.run, { "pipenv", "--py" }, { stdout = true })
-    if success then
+    local success, exit_code, data = pcall(lib.process.run, { "pipenv", "--py" }, { stdout = true })
+    if success and exit_code == 0 then
       local venv = data.stdout:gsub("\n", "")
       if venv then
         python_command_mem[root] = { Path:new(venv).filename }
@@ -54,12 +54,12 @@ function M.get_python_command(root)
   end
 
   if lib.files.exists("pyproject.toml") then
-    local success, _, data = pcall(
+    local success, exit_code, data = pcall(
       lib.process.run,
       { "poetry", "env", "info", "-p" },
       { stdout = true }
     )
-    if success then
+    if success and exit_code == 0 then
       local venv = data.stdout:gsub("\n", "")
       if venv then
         python_command_mem[root] = { Path:new(venv, "bin", "python").filename }
