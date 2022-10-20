@@ -44,7 +44,7 @@ class PytestNeotestAdapter(NeotestAdapter):
             def pytest_deselected(items: List):
                 for report in items:
                     file_path, *name_path = report.nodeid.split("::")
-                    abs_path = str(Path(pytest_config.rootpath, file_path))
+                    abs_path = str(Path(pytest_config.rootdir, file_path))
                     test_name, *namespaces = reversed(name_path)
                     valid_test_name, *params = test_name.split("[")  # ]
                     pos_id = "::".join([abs_path, *namespaces, valid_test_name])
@@ -72,7 +72,7 @@ class PytestNeotestAdapter(NeotestAdapter):
                 ):
                     return
                 file_path, *name_path = report.nodeid.split("::")
-                abs_path = str(Path(pytest_config.rootpath, file_path))
+                abs_path = str(Path(pytest_config.rootdir, file_path))
                 test_name, *namespaces = reversed(name_path)
                 valid_test_name, *params = test_name.split("[")  # ]
                 pos_id = "::".join([abs_path, *namespaces, valid_test_name])
