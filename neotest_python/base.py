@@ -1,5 +1,6 @@
+import abc
 from enum import Enum
-from typing import TYPE_CHECKING, Dict, List, Optional
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional
 
 
 class NeotestResultStatus(str, Enum):
@@ -29,7 +30,8 @@ else:
     NeotestResult = Dict
 
 
-class NeotestAdapter:
+class NeotestAdapter(abc.ABC):
+
     def update_result(
         self, base: Optional[NeotestResult], update: NeotestResult
     ) -> NeotestResult:
@@ -40,3 +42,8 @@ class NeotestAdapter:
             "errors": (base.get("errors") or []) + (update.get("errors") or []) or None,
             "short": (base.get("short") or "") + (update.get("short") or ""),
         }
+
+    @abc.abstractmethod
+    def run(self, args: List[str], stream: Callable):
+        del args, stream
+        raise NotImplementedError
