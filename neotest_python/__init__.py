@@ -3,7 +3,7 @@ import json
 from enum import Enum
 from typing import List
 
-from neotest_python.base import NeotestResult
+from neotest_python.base import NeotestAdapter, NeotestResult
 
 
 class TestRunner(str, Enum):
@@ -11,7 +11,7 @@ class TestRunner(str, Enum):
     UNITTEST = "unittest"
 
 
-def get_adapter(runner: TestRunner):
+def get_adapter(runner: TestRunner) -> NeotestAdapter:
     if runner == TestRunner.PYTEST:
         from .pytest import PytestNeotestAdapter
 
@@ -43,6 +43,7 @@ parser.add_argument("args", nargs="*")
 def main(argv: List[str]):
     args = parser.parse_args(argv)
     adapter = get_adapter(TestRunner(args.runner))
+
     with open(args.stream_file, "w") as stream_file:
 
         def stream(pos_id: str, result: NeotestResult):
@@ -50,5 +51,6 @@ def main(argv: List[str]):
             stream_file.flush()
 
         results = adapter.run(args.args, stream)
+
     with open(args.results_file, "w") as results_file:
         json.dump(results, results_file)
