@@ -10,7 +10,6 @@ if TYPE_CHECKING:
 
 
 class PytestNeotestAdapter(NeotestAdapter):
-
     def run(
         self,
         args: List[str],
@@ -24,7 +23,6 @@ class PytestNeotestAdapter(NeotestAdapter):
 
 
 class NeotestResultCollector:
-
     def __init__(
         self,
         adapter: PytestNeotestAdapter,
@@ -33,10 +31,12 @@ class NeotestResultCollector:
         self.stream = stream
         self.adapter = adapter
 
-        self.pytest_config: "Config" = None   # type: ignore
+        self.pytest_config: "Config" = None  # type: ignore
         self.results: Dict[str, NeotestResult] = {}
 
-    def _get_short_output(self, config: "Config", report: "TestReport") -> Optional[str]:
+    def _get_short_output(
+        self, config: "Config", report: "TestReport"
+    ) -> Optional[str]:
         from _pytest.terminal import TerminalReporter
 
         buffer = StringIO()
@@ -62,9 +62,9 @@ class NeotestResultCollector:
         for report in items:
             file_path, *name_path = report.nodeid.split("::")
             abs_path = str(Path(self.pytest_config.rootdir, file_path))
-            test_name, *namespaces = reversed(name_path)
+            *namespaces, test_name = name_path
             valid_test_name, *params = test_name.split("[")  # ]
-            pos_id = "::".join([abs_path, *namespaces, valid_test_name])
+            pos_id = "::".join([abs_path, *(namespaces), valid_test_name])
             result = self.adapter.update_result(
                 self.results.get(pos_id),
                 {
@@ -88,7 +88,7 @@ class NeotestResultCollector:
 
         file_path, *name_path = report.nodeid.split("::")
         abs_path = str(Path(self.pytest_config.rootdir, file_path))
-        test_name, *namespaces = reversed(name_path)
+        *namespaces, test_name = name_path
         valid_test_name, *params = test_name.split("[")  # ]
         pos_id = "::".join([abs_path, *namespaces, valid_test_name])
 
