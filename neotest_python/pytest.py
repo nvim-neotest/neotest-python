@@ -99,14 +99,14 @@ class NeotestResultCollector:
         short = self._get_short_output(self.pytest_config, report)
 
         if report.outcome == "failed":
-            from _pytest._code.code import ExceptionChainRepr
+            from _pytest._code.code import ExceptionRepr
 
             exc_repr = report.longrepr
             # Test fails due to condition outside of test e.g. xfail
             if isinstance(exc_repr, str):
                 errors.append({"message": exc_repr, "line": None})
             # Test failed internally
-            elif isinstance(exc_repr, ExceptionChainRepr):
+            elif isinstance(exc_repr, ExceptionRepr):
                 reprtraceback = exc_repr.reprtraceback
                 error_message = exc_repr.reprcrash.message  # type: ignore
                 error_line = None
