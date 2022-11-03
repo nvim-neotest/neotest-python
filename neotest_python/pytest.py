@@ -120,7 +120,8 @@ class NeotestResultCollector:
             else:
                 # TODO: Figure out how these are returned and how to represent
                 raise Exception(
-                    "Unhandled error type, please report to neotest-python repo"
+                    f"Unhandled error type ({type(exc_repr)}), please report to"
+                    " neotest-python repo"
                 )
         result: NeotestResult = self.adapter.update_result(
             self.results.get(pos_id),
