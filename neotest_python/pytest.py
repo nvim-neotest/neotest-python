@@ -7,6 +7,7 @@ from .base import NeotestAdapter, NeotestError, NeotestResult, NeotestResultStat
 if TYPE_CHECKING:
     from _pytest.config import Config
     from _pytest.reports import TestReport
+    from pytest import ExceptionInfo
 
 
 class PytestNeotestAdapter(NeotestAdapter):
@@ -36,6 +37,7 @@ class NeotestResultCollector:
 
         self.pytest_config: "Config" = None  # type: ignore
         self.results: Dict[str, NeotestResult] = {}
+        self._excinfo: Optional["ExceptionInfo"] = None
 
     def _get_short_output(
         self, config: "Config", report: "TestReport"
@@ -83,6 +85,15 @@ class NeotestResultCollector:
     def pytest_cmdline_main(self, config: "Config"):
         self.pytest_config = config
 
+    def pytest_runtest_makereport(self, item, call):
+        # pytest_runtest_makereport has access to the original ExceptionInfo object when
+        # an exception is raised: this object is elided from the `report` passed to
+        # pytest_runtest_logreport for certain --tb arguments: we store it here so we
+        # have unconditional access to it later.
+        if call.when != "call":
+            return
+        self._excinfo = call.excinfo
+
     def pytest_runtest_logreport(self, report: "TestReport"):
         if report.when != "call" and not (
             report.outcome == "skipped" and report.when == "setup"
@@ -107,15 +118,11 @@ class NeotestResultCollector:
                 errors.append({"message": exc_repr, "line": None})
             # Test failed internally
             elif isinstance(exc_repr, ExceptionRepr):
-                reprtraceback = exc_repr.reprtraceback
                 error_message = exc_repr.reprcrash.message  # type: ignore
                 error_line = None
-                for repr in reversed(reprtraceback.reprentries):
-                    if (
-                        hasattr(repr, "reprfileloc")
-                        and repr.reprfileloc.path == file_path
-                    ):
-                        error_line = repr.reprfileloc.lineno - 1
+                for traceback_entry in reversed(self._excinfo.traceback):
+                    if str(traceback_entry.path) == abs_path:
+                        error_line = traceback_entry.lineno
                 errors.append({"message": error_message, "line": error_line})
             else:
                 # TODO: Figure out how these are returned and how to represent
@@ -134,6 +141,7 @@ class NeotestResultCollector:
         if not params:
             self.stream(pos_id, result)
         self.results[pos_id] = result
+        self._excinfo = None
 
 
 class NeotestDebugpyPlugin:
