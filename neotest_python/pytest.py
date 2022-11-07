@@ -109,13 +109,17 @@ class NeotestResultCollector:
         errors: List[NeotestError] = []
         short = self._get_short_output(self.pytest_config, report)
 
+        msg_prefix = ""
+        if getattr(item, "callspec", None) is not None:
+            # Parametrized test
+            msg_prefix = f"[{item.callspec.id}] "
         if report.outcome == "failed":
             from _pytest._code.code import ExceptionRepr
 
             exc_repr = report.longrepr
             # Test fails due to condition outside of test e.g. xfail
             if isinstance(exc_repr, str):
-                errors.append({"message": exc_repr, "line": None})
+                errors.append({"message": msg_prefix + exc_repr, "line": None})
             # Test failed internally
             elif isinstance(exc_repr, ExceptionRepr):
                 error_message = exc_repr.reprcrash.message  # type: ignore
@@ -123,7 +127,7 @@ class NeotestResultCollector:
                 for traceback_entry in reversed(call.excinfo.traceback):
                     if str(traceback_entry.path) == abs_path:
                         error_line = traceback_entry.lineno
-                errors.append({"message": error_message, "line": error_line})
+                errors.append({"message": msg_prefix + error_message, "line": error_line})
             else:
                 # TODO: Figure out how these are returned and how to represent
                 raise Exception(
