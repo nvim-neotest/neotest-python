@@ -4,7 +4,10 @@ from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Union
 
 from .base import NeotestAdapter, NeotestError, NeotestResult, NeotestResultStatus
 
+import pytest
+
 if TYPE_CHECKING:
+    from pytest import CallInfo, Item
     from _pytest.config import Config
     from _pytest.reports import TestReport
 
@@ -83,13 +86,21 @@ class NeotestResultCollector:
     def pytest_cmdline_main(self, config: "Config"):
         self.pytest_config = config
 
-    def pytest_runtest_logreport(self, report: "TestReport"):
+    @pytest.hookimpl(hookwrapper=True)
+    def pytest_runtest_makereport(self, item: "Item", call: "CallInfo") -> None:
+        # pytest generates the report.outcome field in its internal
+        # pytest_runtest_makereport implementation, so call it first.  (We don't
+        # implement pytest_runtest_logreport because it doesn't have access to
+        # call.excinfo.)
+        outcome = yield
+        report = outcome.get_result()
+
         if report.when != "call" and not (
             report.outcome == "skipped" and report.when == "setup"
         ):
             return
 
-        file_path, *name_path = report.nodeid.split("::")
+        file_path, *name_path = item.nodeid.split("::")
         abs_path = str(Path(self.pytest_config.rootdir, file_path))
         *namespaces, test_name = name_path
         valid_test_name, *params = test_name.split("[")  # ]
@@ -99,28 +110,25 @@ class NeotestResultCollector:
         short = self._get_short_output(self.pytest_config, report)
 
         if report.outcome == "failed":
-            from _pytest._code.code import ExceptionChainRepr
+            from _pytest._code.code import ExceptionRepr
 
             exc_repr = report.longrepr
             # Test fails due to condition outside of test e.g. xfail
             if isinstance(exc_repr, str):
                 errors.append({"message": exc_repr, "line": None})
             # Test failed internally
-            elif isinstance(exc_repr, ExceptionChainRepr):
-                reprtraceback = exc_repr.reprtraceback
+            elif isinstance(exc_repr, ExceptionRepr):
                 error_message = exc_repr.reprcrash.message  # type: ignore
                 error_line = None
-                for repr in reversed(reprtraceback.reprentries):
-                    if (
-                        hasattr(repr, "reprfileloc")
-                        and repr.reprfileloc.path == file_path
-                    ):
-                        error_line = repr.reprfileloc.lineno - 1
+                for traceback_entry in reversed(call.excinfo.traceback):
+                    if str(traceback_entry.path) == abs_path:
+                        error_line = traceback_entry.lineno
                 errors.append({"message": error_message, "line": error_line})
             else:
                 # TODO: Figure out how these are returned and how to represent
                 raise Exception(
-                    "Unhandled error type, please report to neotest-python repo"
+                    f"Unhandled error type ({type(exc_repr)}), please report to"
+                    " neotest-python repo"
                 )
         result: NeotestResult = self.adapter.update_result(
             self.results.get(pos_id),
