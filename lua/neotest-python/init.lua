@@ -171,9 +171,13 @@ function PythonNeotestAdapter.discover_positions(path)
     require_namespaces = runner == "unittest",
   })
 
-  local handle = io.popen(table.concat(vim.tbl_flatten({ get_python(), get_script(), "--collect" , path}), " "))
+  local cmd = table.concat(vim.tbl_flatten({ get_python(), get_script(), "--collect" , path}), " ")
+  logger.debug(cmd)
+  local handle = io.popen(cmd)
   local result = handle:read("*a")
   handle:close()
+
+  logger.debug(result)
 
   test_instances_from_pytest(ret, result)
 
