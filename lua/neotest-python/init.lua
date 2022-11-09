@@ -1,5 +1,6 @@
 local async = require("neotest.async")
 local lib = require("neotest.lib")
+local logger = require("neotest.logging")
 local base = require("neotest-python.base")
 
 local function get_script()
@@ -79,6 +80,60 @@ function PythonNeotestAdapter.filter_dir(name)
   return name ~= "venv"
 end
 
+
+local function parse_pytest_output(pytest_output)
+    local result = {}
+    for test_id, param_id in pytest_output:gmatch("([^\n]+::[^\n]+)(%[[^\n]+%])\n?") do
+        logger.debug("MATCH", test_id, param_id, result[test_id])
+        if result[test_id] == nil then
+            result[test_id] = {param_id}
+        else
+            table.insert(result[test_id], param_id)
+        end
+    end
+    return result
+end
+
+
+local function add_test_instances(positions, test_instances)
+    for _, value in positions:iter_nodes() do
+        local data = value:data()
+        if data.type ~= "test" then
+            goto continue
+        end
+        logger.debug("N", data)
+        local comparable_id = data.id:gmatch(".*/(.*)")()
+        if test_instances[comparable_id] == nil then
+            goto continue
+        end
+        local parent = value:parent()
+        logger.debug("P", parent)
+        for _, test_instance in pairs(test_instances[comparable_id]) do
+            logger.debug("T", test_instance, data.id .. test_instance)
+
+            local new_data = {}
+            for k,v in pairs(data) do
+                new_data[k] = v
+            end
+
+            new_data.id = data.id .. test_instance
+            new_data.name = data.name .. test_instance
+
+            local new_pos = value:new(new_data, {}, value._key, {}, {})
+            logger.debug("NT", new_pos)
+            value:add_child(new_data.id, new_pos)
+        end
+        ::continue::
+    end
+end
+
+
+local function test_instances_from_pytest(positions, pytest_output)
+  local test_instances = parse_pytest_output(pytest_output)
+  logger.debug(positions)
+  add_test_instances(positions, test_instances)
+end
+
 ---@async
 ---@return Tree | nil
 function PythonNeotestAdapter.discover_positions(path)
@@ -112,9 +167,17 @@ function PythonNeotestAdapter.discover_positions(path)
   local root = PythonNeotestAdapter.root(path)
   local python = get_python(root)
   local runner = get_runner(python)
-  return lib.treesitter.parse_positions(path, query, {
+  local ret = lib.treesitter.parse_positions(path, query, {
     require_namespaces = runner == "unittest",
   })
+
+  local handle = io.popen(table.concat(vim.tbl_flatten({ get_python(), get_script(), "--collect" , path}), " "))
+  local result = handle:read("*a")
+  handle:close()
+
+  test_instances_from_pytest(ret, result)
+
+  return ret
 end
 
 ---@async

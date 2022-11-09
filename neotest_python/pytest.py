@@ -1,3 +1,4 @@
+import os.path
 from io import StringIO
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Union
@@ -176,3 +177,8 @@ class NeotestDebugpyPlugin:
             py_db.stop_on_unhandled_exception(py_db, thread, additional_info, excinfo)
         finally:
             additional_info.is_tracing -= 1
+
+
+def main(args):
+    args.remove("--collect")
+    pytest.main(['--collect-only', '-q'] + args)
