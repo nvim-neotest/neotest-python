@@ -107,6 +107,7 @@ class NeotestResultCollector:
         if getattr(item, "callspec", None) is not None:
             # Parametrized test
             msg_prefix = f"[{item.callspec.id}] "
+            pos_id += f"[{item.callspec.id}]"
         if report.outcome == "failed":
             exc_repr = report.longrepr
             # Test fails due to condition outside of test e.g. xfail
