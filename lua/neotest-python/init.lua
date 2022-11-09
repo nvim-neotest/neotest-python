@@ -118,6 +118,7 @@ local function add_test_instances(positions, test_instances)
 
             new_data.id = data.id .. test_instance
             new_data.name = data.name .. test_instance
+            new_data.should_skip = true
 
             local new_pos = value:new(new_data, {}, value._key, {}, {})
             logger.debug("NT", new_pos)
