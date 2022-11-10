@@ -88,7 +88,7 @@ local function add_test_instances(positions, test_instances)
             goto continue
         end
         logger.debug("N", data)
-        local comparable_id = data.id:gmatch(".*/(.*)")()
+        local comparable_id = string.match(data.id, ".*/(.*)")
         if test_instances[comparable_id] == nil then
             goto continue
         end
