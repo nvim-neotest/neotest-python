@@ -32,11 +32,11 @@ class NeotestResultCollector:
         self.stream = stream
         self.adapter = adapter
 
-        self.pytest_config: Optional[pytest.Config] = None  # type: ignore
+        self.pytest_config: Optional["pytest.Config"] = None  # type: ignore
         self.results: Dict[str, NeotestResult] = {}
 
     def _get_short_output(
-        self, config: pytest.Config, report: pytest.TestReport
+        self, config: "pytest.Config", report: "pytest.TestReport"
     ) -> Optional[str]:
         buffer = StringIO()
         # Hack to get pytest to write ANSI codes
@@ -57,7 +57,7 @@ class NeotestResultCollector:
         buffer.seek(0)
         return buffer.read()
 
-    def pytest_deselected(self, items: List[pytest.Item]):
+    def pytest_deselected(self, items: List["pytest.Item"]):
         for report in items:
             file_path, *name_path = report.nodeid.split("::")
             abs_path = str(Path(self.pytest_config.rootdir, file_path))
@@ -76,11 +76,11 @@ class NeotestResultCollector:
                 self.stream(pos_id, result)
             self.results[pos_id] = result
 
-    def pytest_cmdline_main(self, config: pytest.Config):
+    def pytest_cmdline_main(self, config: "pytest.Config"):
         self.pytest_config = config
 
     @pytest.hookimpl(hookwrapper=True)
-    def pytest_runtest_makereport(self, item: pytest.Item, call: pytest.CallInfo) -> None:
+    def pytest_runtest_makereport(self, item: "pytest.Item", call: "pytest.CallInfo") -> None:
         # pytest generates the report.outcome field in its internal
         # pytest_runtest_makereport implementation, so call it first.  (We don't
         # implement pytest_runtest_logreport because it doesn't have access to
@@ -143,9 +143,9 @@ class NeotestDebugpyPlugin:
 
     def pytest_exception_interact(
         self,
-        node: Union[pytest.Item, pytest.Collector],
-        call: pytest.CallInfo,
-        report: Union[pytest.CollectReport, pytest.TestReport],
+        node: Union["pytest.Item", "pytest.Collector"],
+        call: "pytest.CallInfo",
+        report: Union["pytest.CollectReport", "pytest.TestReport"],
     ):
         # call.excinfo: _pytest._code.ExceptionInfo
         self.maybe_debugpy_postmortem(call.excinfo._excinfo)
