@@ -1,15 +1,12 @@
 from io import StringIO
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Union
+from typing import Callable, Dict, List, Optional, Union
 
 from .base import NeotestAdapter, NeotestError, NeotestResult, NeotestResultStatus
 
 import pytest
-
-if TYPE_CHECKING:
-    from pytest import CallInfo, Item
-    from _pytest.config import Config
-    from _pytest.reports import TestReport
+from _pytest._code.code import ExceptionRepr
+from _pytest.terminal import TerminalReporter
 
 
 class PytestNeotestAdapter(NeotestAdapter):
@@ -18,8 +15,6 @@ class PytestNeotestAdapter(NeotestAdapter):
         args: List[str],
         stream: Callable[[str, NeotestResult], None],
     ) -> Dict[str, NeotestResult]:
-        import pytest
-
         result_collector = NeotestResultCollector(self, stream=stream)
         pytest.main(args=args, plugins=[
             result_collector,
@@ -37,14 +32,12 @@ class NeotestResultCollector:
         self.stream = stream
         self.adapter = adapter
 
-        self.pytest_config: "Config" = None  # type: ignore
+        self.pytest_config: Optional[pytest.Config] = None  # type: ignore
         self.results: Dict[str, NeotestResult] = {}
 
     def _get_short_output(
-        self, config: "Config", report: "TestReport"
+        self, config: pytest.Config, report: pytest.TestReport
     ) -> Optional[str]:
-        from _pytest.terminal import TerminalReporter
-
         buffer = StringIO()
         # Hack to get pytest to write ANSI codes
         setattr(buffer, "isatty", lambda: True)
@@ -64,7 +57,7 @@ class NeotestResultCollector:
         buffer.seek(0)
         return buffer.read()
 
-    def pytest_deselected(self, items: List["pytest.Item"]):
+    def pytest_deselected(self, items: List[pytest.Item]):
         for report in items:
             file_path, *name_path = report.nodeid.split("::")
             abs_path = str(Path(self.pytest_config.rootdir, file_path))
@@ -83,11 +76,11 @@ class NeotestResultCollector:
                 self.stream(pos_id, result)
             self.results[pos_id] = result
 
-    def pytest_cmdline_main(self, config: "Config"):
+    def pytest_cmdline_main(self, config: pytest.Config):
         self.pytest_config = config
 
     @pytest.hookimpl(hookwrapper=True)
-    def pytest_runtest_makereport(self, item: "Item", call: "CallInfo") -> None:
+    def pytest_runtest_makereport(self, item: pytest.Item, call: pytest.CallInfo) -> None:
         # pytest generates the report.outcome field in its internal
         # pytest_runtest_makereport implementation, so call it first.  (We don't
         # implement pytest_runtest_logreport because it doesn't have access to
@@ -114,8 +107,6 @@ class NeotestResultCollector:
             # Parametrized test
             msg_prefix = f"[{item.callspec.id}] "
         if report.outcome == "failed":
-            from _pytest._code.code import ExceptionRepr
-
             exc_repr = report.longrepr
             # Test fails due to condition outside of test e.g. xfail
             if isinstance(exc_repr, str):
@@ -152,9 +143,9 @@ class NeotestDebugpyPlugin:
 
     def pytest_exception_interact(
         self,
-        node: Union['pytest.Item', 'pytest.Collector'],
-        call: 'pytest.CallInfo',
-        report: Union['pytest.CollectReport', 'pytest.TestReport'],
+        node: Union[pytest.Item, pytest.Collector],
+        call: pytest.CallInfo,
+        report: Union[pytest.CollectReport, pytest.TestReport],
     ):
         # call.excinfo: _pytest._code.ExceptionInfo
         self.maybe_debugpy_postmortem(call.excinfo._excinfo)
