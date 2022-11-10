@@ -138,6 +138,22 @@ end
 ---@async
 ---@return Tree | nil
 function PythonNeotestAdapter.discover_positions(path)
+  local root = PythonNeotestAdapter.root(path)
+  local python = get_python(root)
+
+  -- Launch an async job to collect test instances from pytest
+  local cmd = table.concat(vim.tbl_flatten({ python, get_script(), "--collect" , path}), " ")
+  logger.debug(cmd)
+
+  local result_parts = {}
+  local _, pytest_job = pcall(async.fn.jobstart, cmd, {
+    pty = true,
+    on_stdout = function(_, data)
+      table.insert(result_parts, data)
+    end,
+  })
+
+  -- Parse the file while pytest is running
   local query = [[
     ;; Match undecorated functions
     ((function_definition
@@ -165,20 +181,16 @@ function PythonNeotestAdapter.discover_positions(path)
      (#not-has-parent? @namespace.definition decorated_definition)
     )
   ]]
-  local root = PythonNeotestAdapter.root(path)
-  local python = get_python(root)
   local runner = get_runner(python)
   local ret = lib.treesitter.parse_positions(path, query, {
     require_namespaces = runner == "unittest",
   })
 
-  local cmd = table.concat(vim.tbl_flatten({ get_python(), get_script(), "--collect" , path}), " ") .. " 2>&1"
-  logger.debug(cmd)
-  local handle = io.popen(cmd)
-  local result = handle:read("*a")
-  handle:close()
+  -- Wait for pytest to complete, and merge its results into the TS tree
+  async.fn.jobwait({pytest_job})
+  local result = table.concat(vim.tbl_flatten(result_parts),"\n")
 
-  logger.debug(result)
+  logger.debug("RES", result)
 
   test_instances_from_pytest(ret, result)
 
