@@ -97,14 +97,10 @@ local function add_test_instances(positions, test_instances)
         for _, test_instance in pairs(test_instances[comparable_id]) do
             logger.debug("T", test_instance, data.id .. test_instance)
 
-            local new_data = {}
-            for k,v in pairs(data) do
-                new_data[k] = v
-            end
-
-            new_data.id = data.id .. test_instance
-            new_data.name = data.name .. test_instance
-            new_data.should_skip = true
+            local new_data = vim.tbl_extend("force", data, {
+                id = data.id .. test_instance,
+                name = data.name .. test_instance,
+            })
 
             local new_pos = value:new(new_data, {}, value._key, {}, {})
             logger.debug("NT", new_pos)
