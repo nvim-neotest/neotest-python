@@ -81,14 +81,14 @@ function PythonNeotestAdapter.filter_dir(name)
 end
 
 
-local function add_test_instances(positions, test_instances)
+local function add_test_instances(root, positions, test_instances)
     for _, value in positions:iter_nodes() do
         local data = value:data()
         if data.type ~= "test" then
             goto continue
         end
         logger.debug("N", data)
-        local comparable_id = string.match(data.id, ".*/(.*)")
+        local comparable_id = string.match(data.id, root .. "/(.*)")
         if test_instances[comparable_id] == nil then
             goto continue
         end
@@ -174,7 +174,7 @@ function PythonNeotestAdapter.discover_positions(path)
   -- Wait for pytest to complete, and merge its results into the TS tree
   async.fn.jobwait({pytest_job})
 
-  add_test_instances(positions, test_instances)
+  add_test_instances(root, positions, test_instances)
 
   return positions
 end
