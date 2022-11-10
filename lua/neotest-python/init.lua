@@ -81,20 +81,6 @@ function PythonNeotestAdapter.filter_dir(name)
 end
 
 
-local function parse_pytest_output(pytest_output)
-    local result = {}
-    for test_id, param_id in pytest_output:gmatch("([^\n]+::[^\n]+)(%[[^\n]+%])\n?") do
-        logger.debug("MATCH", test_id, param_id, result[test_id])
-        if result[test_id] == nil then
-            result[test_id] = {param_id}
-        else
-            table.insert(result[test_id], param_id)
-        end
-    end
-    return result
-end
-
-
 local function add_test_instances(positions, test_instances)
     for _, value in positions:iter_nodes() do
         local data = value:data()
@@ -128,13 +114,6 @@ local function add_test_instances(positions, test_instances)
     end
 end
 
-
-local function test_instances_from_pytest(positions, pytest_output)
-  local test_instances = parse_pytest_output(pytest_output)
-  logger.debug(positions)
-  add_test_instances(positions, test_instances)
-end
-
 ---@async
 ---@return Tree | nil
 function PythonNeotestAdapter.discover_positions(path)
@@ -145,11 +124,21 @@ function PythonNeotestAdapter.discover_positions(path)
   local cmd = table.concat(vim.tbl_flatten({ python, get_script(), "--collect" , path}), " ")
   logger.debug(cmd)
 
-  local result_parts = {}
+  local test_instances = {}
   local _, pytest_job = pcall(async.fn.jobstart, cmd, {
     pty = true,
     on_stdout = function(_, data)
-      table.insert(result_parts, data)
+      for _, line in pairs(data) do
+        test_id, param_id = string.match(line, "(.+::.+)(%[.+%])\r?")
+        if test_id and param_id then
+          logger.debug("MATCH", test_id, param_id, test_instances[test_id])
+          if test_instances[test_id] == nil then
+              test_instances[test_id] = {param_id}
+          else
+              table.insert(test_instances[test_id], param_id)
+          end
+        end
+      end
     end,
   })
 
@@ -182,19 +171,16 @@ function PythonNeotestAdapter.discover_positions(path)
     )
   ]]
   local runner = get_runner(python)
-  local ret = lib.treesitter.parse_positions(path, query, {
+  local positions = lib.treesitter.parse_positions(path, query, {
     require_namespaces = runner == "unittest",
   })
 
   -- Wait for pytest to complete, and merge its results into the TS tree
   async.fn.jobwait({pytest_job})
-  local result = table.concat(vim.tbl_flatten(result_parts),"\n")
 
-  logger.debug("RES", result)
+  add_test_instances(positions, test_instances)
 
-  test_instances_from_pytest(ret, result)
-
-  return ret
+  return positions
 end
 
 ---@async
