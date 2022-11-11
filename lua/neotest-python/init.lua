@@ -112,6 +112,25 @@ local function add_test_instances(root, positions, test_instances)
 end
 
 ---@async
+---@param path string
+---@return boolean
+local function has_parametrize(path)
+    local query = [[
+      ;; Detect parametrize decorators
+      (decorator
+        (call
+          function:
+            (attribute
+              attribute: (identifier) @parametrize
+              (#eq? @parametrize "parametrize"))))
+    ]]
+    local content = lib.files.read(path)
+    local ts_root, lang = lib.treesitter.get_parse_root(path, content, { fast = true })
+    local built_query = lib.treesitter.normalise_query(lang, query)
+    return built_query:iter_matches(ts_root, content)() ~= nil
+end
+
+---@async
 ---@return Tree | nil
 function PythonNeotestAdapter.discover_positions(path)
   local root = PythonNeotestAdapter.root(path)
@@ -120,7 +139,7 @@ function PythonNeotestAdapter.discover_positions(path)
 
   local pytest_job
   local test_instances = {}
-  if runner == "pytest" then
+  if runner == "pytest" and has_parametrize(path) then
     -- Launch an async job to collect test instances from pytest
     local cmd = table.concat(vim.tbl_flatten({ python, get_script(), "--collect" , path}), " ")
     logger.debug(cmd)
