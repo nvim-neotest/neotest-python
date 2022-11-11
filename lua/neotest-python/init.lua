@@ -116,28 +116,32 @@ end
 function PythonNeotestAdapter.discover_positions(path)
   local root = PythonNeotestAdapter.root(path)
   local python = get_python(root)
+  local runner = get_runner(python)
 
-  -- Launch an async job to collect test instances from pytest
-  local cmd = table.concat(vim.tbl_flatten({ python, get_script(), "--collect" , path}), " ")
-  logger.debug(cmd)
-
+  local pytest_job
   local test_instances = {}
-  local _, pytest_job = pcall(async.fn.jobstart, cmd, {
-    pty = true,
-    on_stdout = function(_, data)
-      for _, line in pairs(data) do
-        test_id, param_id = string.match(line, "(.+::.+)(%[.+%])\r?")
-        if test_id and param_id then
-          logger.debug("MATCH", test_id, param_id, test_instances[test_id])
-          if test_instances[test_id] == nil then
-              test_instances[test_id] = {param_id}
-          else
-              table.insert(test_instances[test_id], param_id)
+  if runner == "pytest" then
+    -- Launch an async job to collect test instances from pytest
+    local cmd = table.concat(vim.tbl_flatten({ python, get_script(), "--collect" , path}), " ")
+    logger.debug(cmd)
+
+    _, pytest_job = pcall(async.fn.jobstart, cmd, {
+      pty = true,
+      on_stdout = function(_, data)
+        for _, line in pairs(data) do
+          local test_id, param_id = string.match(line, "(.+::.+)(%[.+%])\r?")
+          if test_id and param_id then
+            logger.debug("MATCH", test_id, param_id, test_instances[test_id])
+            if test_instances[test_id] == nil then
+                test_instances[test_id] = {param_id}
+            else
+                table.insert(test_instances[test_id], param_id)
+            end
           end
         end
-      end
-    end,
-  })
+      end,
+    })
+  end
 
   -- Parse the file while pytest is running
   local query = [[
@@ -167,15 +171,16 @@ function PythonNeotestAdapter.discover_positions(path)
      (#not-has-parent? @namespace.definition decorated_definition)
     )
   ]]
-  local runner = get_runner(python)
   local positions = lib.treesitter.parse_positions(path, query, {
     require_namespaces = runner == "unittest",
   })
 
-  -- Wait for pytest to complete, and merge its results into the TS tree
-  async.fn.jobwait({pytest_job})
+  if pytest_job then
+    -- Wait for pytest to complete, and merge its results into the TS tree
+    async.fn.jobwait({pytest_job})
 
-  add_test_instances(root, positions, test_instances)
+    add_test_instances(root, positions, test_instances)
+  end
 
   return positions
 end
