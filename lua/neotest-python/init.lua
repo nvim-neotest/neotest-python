@@ -101,6 +101,7 @@ local function add_test_instances(root, positions, test_instances)
             local new_data = vim.tbl_extend("force", data, {
                 id = data.id .. test_instance,
                 name = data.name .. test_instance,
+                range = nil,
             })
 
             local new_pos = value:new(new_data, {}, value._key, {}, {})
