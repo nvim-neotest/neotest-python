@@ -92,7 +92,6 @@ local function add_test_instances(root, positions, test_instances)
         if test_instances[comparable_id] == nil then
             goto continue
         end
-        local parent = value:parent()
         for _, test_instance in pairs(test_instances[comparable_id]) do
             local new_data = vim.tbl_extend("force", data, {
                 id = data.id .. test_instance,
