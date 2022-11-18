@@ -16,6 +16,7 @@ end
 
 local dap_args
 local is_test_file = base.is_test_file
+local pytest_discover_instances = false
 
 local function get_strategy_config(strategy, python, program, args)
   local config = {
@@ -134,7 +135,7 @@ function PythonNeotestAdapter.discover_positions(path)
 
   local pytest_job
   local test_instances = {}
-  if runner == "pytest" and has_parametrize(path) then
+  if runner == "pytest" and pytest_discover_instances and has_parametrize(path) then
     -- Launch an async job to collect test instances from pytest
     local cmd = table.concat(vim.tbl_flatten({ python, get_script(), "--pytest-collect" , path}), " ")
     logger.debug("Running test instance discovery:", cmd)
@@ -312,6 +313,9 @@ setmetatable(PythonNeotestAdapter, {
     end
     if type(opts.dap) == "table" then
       dap_args = opts.dap
+    end
+    if opts.pytest_discover_instances ~= nil then
+      pytest_discover_instances = opts.pytest_discover_instances
     end
     return PythonNeotestAdapter
   end,
