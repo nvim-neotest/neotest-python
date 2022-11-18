@@ -15,10 +15,6 @@ def add_to_path():
 
 with add_to_path():
     from neotest_python import main
-    from neotest_python import pytest
 
 if __name__ == "__main__":
-    if "--collect" in sys.argv:
-        pytest.main(sys.argv[1:])
-    else:
-        main(sys.argv[1:])
+    main(sys.argv[1:])

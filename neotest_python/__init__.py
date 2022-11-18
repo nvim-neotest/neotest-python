@@ -41,6 +41,12 @@ parser.add_argument("args", nargs="*")
 
 
 def main(argv: List[str]):
+    if "--pytest-collect" in argv:
+        argv.remove("--pytest-collect")
+        from .pytest import collect
+        collect(argv)
+        return
+
     args = parser.parse_args(argv)
     adapter = get_adapter(TestRunner(args.runner))
 

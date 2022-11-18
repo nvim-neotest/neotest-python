@@ -180,6 +180,5 @@ class NeotestDebugpyPlugin:
             additional_info.is_tracing -= 1
 
 
-def main(args):
-    args.remove("--collect")
+def collect(args):
     pytest.main(['--collect-only', '-q'] + args)

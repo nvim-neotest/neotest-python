@@ -142,7 +142,7 @@ function PythonNeotestAdapter.discover_positions(path)
   local test_instances = {}
   if runner == "pytest" and has_parametrize(path) then
     -- Launch an async job to collect test instances from pytest
-    local cmd = table.concat(vim.tbl_flatten({ python, get_script(), "--collect" , path}), " ")
+    local cmd = table.concat(vim.tbl_flatten({ python, get_script(), "--pytest-collect" , path}), " ")
     logger.debug(cmd)
 
     _, pytest_job = pcall(async.fn.jobstart, cmd, {
