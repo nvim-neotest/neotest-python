@@ -1,4 +1,3 @@
-import os.path
 from io import StringIO
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Union
