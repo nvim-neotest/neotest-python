@@ -87,17 +87,13 @@ local function add_test_instances(root, positions, test_instances)
         if data.type ~= "test" then
             goto continue
         end
-        logger.debug("N", data)
         local _, end_idx = string.find(data.id, root .. "/", 1, true)
         local comparable_id = string.sub(data.id, end_idx + 1)
         if test_instances[comparable_id] == nil then
             goto continue
         end
         local parent = value:parent()
-        logger.debug("P", parent)
         for _, test_instance in pairs(test_instances[comparable_id]) do
-            logger.debug("T", test_instance, data.id .. test_instance)
-
             local new_data = vim.tbl_extend("force", data, {
                 id = data.id .. test_instance,
                 name = data.name .. test_instance,
@@ -105,7 +101,6 @@ local function add_test_instances(root, positions, test_instances)
             })
 
             local new_pos = value:new(new_data, {}, value._key, {}, {})
-            logger.debug("NT", new_pos)
             value:add_child(new_data.id, new_pos)
         end
         ::continue::
@@ -143,7 +138,7 @@ function PythonNeotestAdapter.discover_positions(path)
   if runner == "pytest" and has_parametrize(path) then
     -- Launch an async job to collect test instances from pytest
     local cmd = table.concat(vim.tbl_flatten({ python, get_script(), "--pytest-collect" , path}), " ")
-    logger.debug(cmd)
+    logger.debug("Running test instance discovery:", cmd)
 
     _, pytest_job = pcall(async.fn.jobstart, cmd, {
       pty = true,
@@ -151,7 +146,6 @@ function PythonNeotestAdapter.discover_positions(path)
         for _, line in pairs(data) do
           local test_id, param_id = string.match(line, "(.+::.+)(%[.+%])\r?")
           if test_id and param_id then
-            logger.debug("MATCH", test_id, param_id, test_instances[test_id])
             if test_instances[test_id] == nil then
                 test_instances[test_id] = {param_id}
             else
