@@ -88,9 +88,8 @@ function PythonNeotestAdapter.discover_positions(path)
   local python = get_python(root)
   local runner = get_runner(python)
 
-  local pytest_job, test_instances
   if runner == "pytest" and pytest_discover_instances and pytest.has_parametrize(path) then
-    pytest_job, test_instances = pytest.discover_instances(python, get_script(), path)
+    pytest.discover_instances(python, get_script(), path)
   end
 
   -- Parse the file while pytest is running
@@ -125,12 +124,7 @@ function PythonNeotestAdapter.discover_positions(path)
     require_namespaces = runner == "unittest",
   })
 
-  if pytest_job then
-    -- Wait for pytest to complete, and merge its results into the TS tree
-    async.fn.jobwait({pytest_job})
-
-    pytest.add_test_instances(root, positions, test_instances)
-  end
+  pytest.add_discovered_positions(root, positions)
 
   return positions
 end

@@ -4,6 +4,10 @@ local logger = require("neotest.logging")
 
 local M = {}
 
+local pytest_job
+local test_instances = {}
+
+---@async
 function M.add_test_instances(root, positions, test_instances)
   for _, value in positions:iter_nodes() do
     local data = value:data()
@@ -48,13 +52,13 @@ function M.has_parametrize(path)
   return built_query:iter_matches(ts_root, content)() ~= nil
 end
 
+---@async
 function M.discover_instances(python, script, path)
   -- Launch an async job to collect test instances from pytest
   local cmd = table.concat(vim.tbl_flatten({ python, script, "--pytest-collect", path }), " ")
   logger.debug("Running test instance discovery:", cmd)
 
-  local test_instances = {}
-  local _, pytest_job = pcall(async.fn.jobstart, cmd, {
+  _, pytest_job = pcall(async.fn.jobstart, cmd, {
     pty = true,
     on_stdout = function(_, data)
       for _, line in pairs(data) do
@@ -69,7 +73,16 @@ function M.discover_instances(python, script, path)
       end
     end,
   })
-  return pytest_job, test_instances
+end
+
+---@async
+function M.add_discovered_positions(root, positions)
+  if pytest_job then
+    -- Wait for pytest to complete, and merge its results into the TS tree
+    async.fn.jobwait({ pytest_job })
+
+    M.add_test_instances(root, positions, test_instances)
+  end
 end
 
 return M
