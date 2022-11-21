@@ -130,7 +130,7 @@ function PythonNeotestAdapter.discover_positions(path)
   })
 
   if runner == "pytest" then
-    pytest.add_any_discovered_positions(root, positions, path)
+    pytest.add_any_discovered_test_instances(root, positions, path)
   end
 
   return positions

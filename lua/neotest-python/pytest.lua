@@ -8,6 +8,10 @@ local pytest_jobs = {}
 local test_instances = {}
 
 ---@async
+---Add test instances for path in root to positions
+---@param root string
+---@param positions Tree
+---@param path string
 local function add_test_instances(root, positions, path)
   local test_instances_for_path = test_instances[path]
   if not test_instances_for_path then
@@ -57,8 +61,11 @@ local function has_parametrize(path)
 end
 
 ---@async
+---Launch an async job to discover test instances for path (by running script using python)
+---@param python string[]
+---@param script string
+---@param path string
 local function discover_instances(python, script, path)
-  -- Launch an async job to collect test instances from pytest
   local cmd = table.concat(vim.tbl_flatten({ python, script, "--pytest-collect", path }), " ")
   logger.debug("Running test instance discovery:", cmd)
 
@@ -82,7 +89,11 @@ local function discover_instances(python, script, path)
 end
 
 ---@async
-function M.add_any_discovered_positions(root, positions, path)
+---Add any test instances discovered for path in root to positions
+---@param root string
+---@param positions Tree
+---@param path string
+function M.add_any_discovered_test_instances(root, positions, path)
   local pytest_job = pytest_jobs[path]
   if pytest_job then
     -- Wait for pytest to complete, and merge its results into the TS tree
@@ -92,6 +103,12 @@ function M.add_any_discovered_positions(root, positions, path)
   end
 end
 
+---@async
+---Launch pytest to discover test instances for path, if configured
+---@param pytest_discover_instances boolean
+---@param python string[]
+---@param script string
+---@param path string
 function M.start_test_instance_discovery_if_needed(pytest_discover_instances, python, script, path)
   if pytest_discover_instances and has_parametrize(path) then
     discover_instances(python, script, path)
