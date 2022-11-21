@@ -88,8 +88,13 @@ function PythonNeotestAdapter.discover_positions(path)
   local python = get_python(root)
   local runner = get_runner(python)
 
-  if runner == "pytest" and pytest_discover_instances and pytest.has_parametrize(path) then
-    pytest.discover_instances(python, get_script(), path)
+  if runner == "pytest" then
+    pytest.start_test_instance_discovery_if_needed(
+      pytest_discover_instances,
+      python,
+      get_script(),
+      path
+    )
   end
 
   -- Parse the file while pytest is running
@@ -124,7 +129,9 @@ function PythonNeotestAdapter.discover_positions(path)
     require_namespaces = runner == "unittest",
   })
 
-  pytest.add_discovered_positions(root, positions, path)
+  if runner == "pytest" then
+    pytest.add_any_discovered_positions(root, positions, path)
+  end
 
   return positions
 end

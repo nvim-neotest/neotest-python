@@ -40,7 +40,7 @@ end
 ---@async
 ---@param path string
 ---@return boolean
-function M.has_parametrize(path)
+local function has_parametrize(path)
   local query = [[
     ;; Detect parametrize decorators
     (decorator
@@ -57,7 +57,7 @@ function M.has_parametrize(path)
 end
 
 ---@async
-function M.discover_instances(python, script, path)
+local function discover_instances(python, script, path)
   -- Launch an async job to collect test instances from pytest
   local cmd = table.concat(vim.tbl_flatten({ python, script, "--pytest-collect", path }), " ")
   logger.debug("Running test instance discovery:", cmd)
@@ -82,13 +82,19 @@ function M.discover_instances(python, script, path)
 end
 
 ---@async
-function M.add_discovered_positions(root, positions, path)
+function M.add_any_discovered_positions(root, positions, path)
   local pytest_job = pytest_jobs[path]
   if pytest_job then
     -- Wait for pytest to complete, and merge its results into the TS tree
     async.fn.jobwait({ pytest_job })
 
     add_test_instances(root, positions, path)
+  end
+end
+
+function M.start_test_instance_discovery_if_needed(pytest_discover_instances, python, script, path)
+  if pytest_discover_instances and has_parametrize(path) then
+    discover_instances(python, script, path)
   end
 end
 
