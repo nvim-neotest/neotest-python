@@ -1,6 +1,5 @@
 local async = require("neotest.async")
 local lib = require("neotest.lib")
-local logger = require("neotest.logging")
 local base = require("neotest-python.base")
 local pytest = require("neotest-python.pytest")
 
@@ -89,28 +88,9 @@ function PythonNeotestAdapter.discover_positions(path)
   local python = get_python(root)
   local runner = get_runner(python)
 
-  local pytest_job
-  local test_instances = {}
+  local pytest_job, test_instances
   if runner == "pytest" and pytest_discover_instances and pytest.has_parametrize(path) then
-    -- Launch an async job to collect test instances from pytest
-    local cmd = table.concat(vim.tbl_flatten({ python, get_script(), "--pytest-collect" , path}), " ")
-    logger.debug("Running test instance discovery:", cmd)
-
-    _, pytest_job = pcall(async.fn.jobstart, cmd, {
-      pty = true,
-      on_stdout = function(_, data)
-        for _, line in pairs(data) do
-          local test_id, param_id = string.match(line, "(.+::.+)(%[.+%])\r?")
-          if test_id and param_id then
-            if test_instances[test_id] == nil then
-              test_instances[test_id] = {param_id}
-            else
-              table.insert(test_instances[test_id], param_id)
-            end
-          end
-        end
-      end,
-    })
+    pytest_job, test_instances = pytest.discover_instances(python, get_script(), path)
   end
 
   -- Parse the file while pytest is running

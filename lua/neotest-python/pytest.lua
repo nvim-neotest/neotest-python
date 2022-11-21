@@ -1,4 +1,6 @@
+local async = require("neotest.async")
 local lib = require("neotest.lib")
+local logger = require("neotest.logging")
 
 local M = {}
 
@@ -44,6 +46,30 @@ function M.has_parametrize(path)
   local ts_root, lang = lib.treesitter.get_parse_root(path, content, { fast = true })
   local built_query = lib.treesitter.normalise_query(lang, query)
   return built_query:iter_matches(ts_root, content)() ~= nil
+end
+
+function M.discover_instances(python, script, path)
+  -- Launch an async job to collect test instances from pytest
+  local cmd = table.concat(vim.tbl_flatten({ python, script, "--pytest-collect", path }), " ")
+  logger.debug("Running test instance discovery:", cmd)
+
+  local test_instances = {}
+  local _, pytest_job = pcall(async.fn.jobstart, cmd, {
+    pty = true,
+    on_stdout = function(_, data)
+      for _, line in pairs(data) do
+        local test_id, param_id = string.match(line, "(.+::.+)(%[.+%])\r?")
+        if test_id and param_id then
+          if test_instances[test_id] == nil then
+            test_instances[test_id] = { param_id }
+          else
+            table.insert(test_instances[test_id], param_id)
+          end
+        end
+      end
+    end,
+  })
+  return pytest_job, test_instances
 end
 
 return M
