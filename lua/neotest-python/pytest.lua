@@ -4,11 +4,15 @@ local logger = require("neotest.logging")
 
 local M = {}
 
-local pytest_job
+local pytest_jobs = {}
 local test_instances = {}
 
 ---@async
-function M.add_test_instances(root, positions, test_instances)
+local function add_test_instances(root, positions, path)
+  local test_instances_for_path = test_instances[path]
+  if not test_instances_for_path then
+    return
+  end
   for _, value in positions:iter_nodes() do
     local data = value:data()
     if data.type ~= "test" then
@@ -16,10 +20,10 @@ function M.add_test_instances(root, positions, test_instances)
     end
     local _, end_idx = string.find(data.id, root .. "/", 1, true)
     local comparable_id = string.sub(data.id, end_idx + 1)
-    if test_instances[comparable_id] == nil then
+    if test_instances_for_path[comparable_id] == nil then
       goto continue
     end
-    for _, test_instance in pairs(test_instances[comparable_id]) do
+    for _, test_instance in pairs(test_instances_for_path[comparable_id]) do
       local new_data = vim.tbl_extend("force", data, {
         id = data.id .. test_instance,
         name = data.name .. test_instance,
@@ -58,16 +62,18 @@ function M.discover_instances(python, script, path)
   local cmd = table.concat(vim.tbl_flatten({ python, script, "--pytest-collect", path }), " ")
   logger.debug("Running test instance discovery:", cmd)
 
-  _, pytest_job = pcall(async.fn.jobstart, cmd, {
+  test_instances[path] = {}
+  local test_instances_for_path = test_instances[path]
+  _, pytest_jobs[path] = pcall(async.fn.jobstart, cmd, {
     pty = true,
     on_stdout = function(_, data)
       for _, line in pairs(data) do
         local test_id, param_id = string.match(line, "(.+::.+)(%[.+%])\r?")
         if test_id and param_id then
-          if test_instances[test_id] == nil then
-            test_instances[test_id] = { param_id }
+          if test_instances_for_path[test_id] == nil then
+            test_instances_for_path[test_id] = { param_id }
           else
-            table.insert(test_instances[test_id], param_id)
+            table.insert(test_instances_for_path[test_id], param_id)
           end
         end
       end
@@ -76,12 +82,13 @@ function M.discover_instances(python, script, path)
 end
 
 ---@async
-function M.add_discovered_positions(root, positions)
+function M.add_discovered_positions(root, positions, path)
+  local pytest_job = pytest_jobs[path]
   if pytest_job then
     -- Wait for pytest to complete, and merge its results into the TS tree
     async.fn.jobwait({ pytest_job })
 
-    M.add_test_instances(root, positions, test_instances)
+    add_test_instances(root, positions, path)
   end
 end
 

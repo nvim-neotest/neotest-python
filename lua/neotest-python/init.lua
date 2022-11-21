@@ -124,7 +124,7 @@ function PythonNeotestAdapter.discover_positions(path)
     require_namespaces = runner == "unittest",
   })
 
-  pytest.add_discovered_positions(root, positions)
+  pytest.add_discovered_positions(root, positions, path)
 
   return positions
 end
