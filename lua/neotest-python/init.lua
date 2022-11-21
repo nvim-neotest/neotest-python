@@ -2,6 +2,7 @@ local async = require("neotest.async")
 local lib = require("neotest.lib")
 local logger = require("neotest.logging")
 local base = require("neotest-python.base")
+local pytest = require("neotest-python.pytest")
 
 local function get_script()
   local paths = vim.api.nvim_get_runtime_file("neotest.py", true)
@@ -81,51 +82,6 @@ function PythonNeotestAdapter.filter_dir(name)
   return name ~= "venv"
 end
 
-
-local function add_test_instances(root, positions, test_instances)
-  for _, value in positions:iter_nodes() do
-    local data = value:data()
-    if data.type ~= "test" then
-      goto continue
-    end
-    local _, end_idx = string.find(data.id, root .. "/", 1, true)
-    local comparable_id = string.sub(data.id, end_idx + 1)
-    if test_instances[comparable_id] == nil then
-      goto continue
-    end
-    for _, test_instance in pairs(test_instances[comparable_id]) do
-      local new_data = vim.tbl_extend("force", data, {
-        id = data.id .. test_instance,
-        name = data.name .. test_instance,
-        range = nil,
-      })
-
-      local new_pos = value:new(new_data, {}, value._key, {}, {})
-      value:add_child(new_data.id, new_pos)
-    end
-    ::continue::
-  end
-end
-
----@async
----@param path string
----@return boolean
-local function has_parametrize(path)
-  local query = [[
-    ;; Detect parametrize decorators
-    (decorator
-      (call
-        function:
-          (attribute
-            attribute: (identifier) @parametrize
-            (#eq? @parametrize "parametrize"))))
-  ]]
-  local content = lib.files.read(path)
-  local ts_root, lang = lib.treesitter.get_parse_root(path, content, { fast = true })
-  local built_query = lib.treesitter.normalise_query(lang, query)
-  return built_query:iter_matches(ts_root, content)() ~= nil
-end
-
 ---@async
 ---@return Tree | nil
 function PythonNeotestAdapter.discover_positions(path)
@@ -135,7 +91,7 @@ function PythonNeotestAdapter.discover_positions(path)
 
   local pytest_job
   local test_instances = {}
-  if runner == "pytest" and pytest_discover_instances and has_parametrize(path) then
+  if runner == "pytest" and pytest_discover_instances and pytest.has_parametrize(path) then
     -- Launch an async job to collect test instances from pytest
     local cmd = table.concat(vim.tbl_flatten({ python, get_script(), "--pytest-collect" , path}), " ")
     logger.debug("Running test instance discovery:", cmd)
@@ -193,7 +149,7 @@ function PythonNeotestAdapter.discover_positions(path)
     -- Wait for pytest to complete, and merge its results into the TS tree
     async.fn.jobwait({pytest_job})
 
-    add_test_instances(root, positions, test_instances)
+    pytest.add_test_instances(root, positions, test_instances)
   end
 
   return positions
