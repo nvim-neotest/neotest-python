@@ -31,8 +31,8 @@ local function add_test_instances(root, positions, path)
       local new_data = vim.tbl_extend("force", data, {
         id = data.id .. test_instance,
         name = data.name .. test_instance,
-        range = nil,
       })
+      new_data.range = nil
 
       local new_pos = value:new(new_data, {}, value._key, {}, {})
       value:add_child(new_data.id, new_pos)
