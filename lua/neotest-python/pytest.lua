@@ -1,43 +1,28 @@
-local async = require("neotest.async")
 local lib = require("neotest.lib")
 local logger = require("neotest.logging")
 
 local M = {}
 
-local pytest_jobs = {}
-local test_instances = {}
-
 ---@async
 ---Add test instances for path in root to positions
----@param root string
----@param positions Tree
----@param path string
-local function add_test_instances(root, positions, path)
-  local test_instances_for_path = test_instances[path]
-  if not test_instances_for_path then
-    return
-  end
-  for _, value in positions:iter_nodes() do
-    local data = value:data()
-    if data.type ~= "test" then
-      goto continue
-    end
-    local _, end_idx = string.find(data.id, root .. "/", 1, true)
-    local comparable_id = string.sub(data.id, end_idx + 1)
-    if test_instances_for_path[comparable_id] == nil then
-      goto continue
-    end
-    for _, test_instance in pairs(test_instances_for_path[comparable_id]) do
-      local new_data = vim.tbl_extend("force", data, {
-        id = data.id .. test_instance,
-        name = data.name .. test_instance,
-      })
-      new_data.range = nil
+---@param positions neotest.Tree
+---@param test_params table<string, string[]>
+local function add_test_instances(positions, test_params)
+  for _, node in positions:iter_nodes() do
+    local position = node:data()
+    if position.type == "test" then
+      local pos_params = test_params[position.id] or {}
+      for _, params_str in ipairs(pos_params) do
+        local new_data = vim.tbl_extend("force", position, {
+          id = string.format("%s[%s]", position.id, params_str),
+          name = string.format("%s[%s]", position.name, params_str),
+        })
+        new_data.range = nil
 
-      local new_pos = value:new(new_data, {}, value._key, {}, {})
-      value:add_child(new_data.id, new_pos)
+        local new_pos = node:new(new_data, {}, node._key, {}, {})
+        node:add_child(new_data.id, new_pos)
+      end
     end
-    ::continue::
   end
 end
 
@@ -65,53 +50,51 @@ end
 ---@param python string[]
 ---@param script string
 ---@param path string
-local function discover_instances(python, script, path)
-  local cmd = table.concat(vim.tbl_flatten({ python, script, "--pytest-collect", path }), " ")
+---@param positions neotest.Tree
+---@param root string
+local function discover_params(python, script, path, positions, root)
+  local cmd = vim.tbl_flatten({ python, script, "--pytest-collect", path })
   logger.debug("Running test instance discovery:", cmd)
 
-  test_instances[path] = {}
-  local test_instances_for_path = test_instances[path]
-  _, pytest_jobs[path] = pcall(async.fn.jobstart, cmd, {
-    pty = true,
-    on_stdout = function(_, data)
-      for _, line in pairs(data) do
-        local test_id, param_id = string.match(line, "(.+::.+)(%[.+%])\r?")
-        if test_id and param_id then
-          if test_instances_for_path[test_id] == nil then
-            test_instances_for_path[test_id] = { param_id }
-          else
-            table.insert(test_instances_for_path[test_id], param_id)
-          end
+  local test_params = {}
+  local res, data = lib.process.run(cmd, { stdout = true, stderr = true })
+  if res ~= 0 then
+    logger.warn("Pytest discovery failed")
+    if data.stderr then
+      logger.debug(data.stderr)
+    end
+    return {}
+  end
+
+  for line in vim.gsplit(data.stdout, "\n", true) do
+    local param_index = string.find(line, "[", nil, true)
+    if param_index then
+      local test_id = root .. lib.files.path.sep .. string.sub(line, 1, param_index - 1)
+      local param_id = string.sub(line, param_index + 1, #line - 1)
+
+      if positions:get_key(test_id) then
+        if not test_params[test_id] then
+          test_params[test_id] = { param_id }
+        else
+          table.insert(test_params[test_id], param_id)
         end
       end
-    end,
-  })
-end
-
----@async
----Add any test instances discovered for path in root to positions
----@param root string
----@param positions Tree
----@param path string
-function M.add_any_discovered_test_instances(root, positions, path)
-  local pytest_job = pytest_jobs[path]
-  if pytest_job then
-    -- Wait for pytest to complete, and merge its results into the TS tree
-    async.fn.jobwait({ pytest_job })
-
-    add_test_instances(root, positions, path)
+    end
   end
+  return test_params
 end
 
 ---@async
 ---Launch pytest to discover test instances for path, if configured
----@param pytest_discover_instances boolean
 ---@param python string[]
 ---@param script string
 ---@param path string
-function M.start_test_instance_discovery_if_needed(pytest_discover_instances, python, script, path)
-  if pytest_discover_instances and has_parametrize(path) then
-    discover_instances(python, script, path)
+---@param positions neotest.Tree
+---@param root string
+function M.augment_positions(python, script, path, positions, root)
+  if has_parametrize(path) then
+    local test_params = discover_params(python, script, path, positions, root)
+    add_test_instances(positions, test_params)
   end
 end
 

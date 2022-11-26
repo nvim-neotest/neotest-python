@@ -82,20 +82,11 @@ function PythonNeotestAdapter.filter_dir(name)
 end
 
 ---@async
----@return Tree | nil
+---@return neotest.Tree | nil
 function PythonNeotestAdapter.discover_positions(path)
-  local root = PythonNeotestAdapter.root(path)
+  local root = PythonNeotestAdapter.root(path) or vim.loop.cwd()
   local python = get_python(root)
   local runner = get_runner(python)
-
-  if runner == "pytest" then
-    pytest.start_test_instance_discovery_if_needed(
-      pytest_discover_instances,
-      python,
-      get_script(),
-      path
-    )
-  end
 
   -- Parse the file while pytest is running
   local query = [[
@@ -129,8 +120,8 @@ function PythonNeotestAdapter.discover_positions(path)
     require_namespaces = runner == "unittest",
   })
 
-  if runner == "pytest" then
-    pytest.add_any_discovered_test_instances(root, positions, path)
+  if runner == "pytest" and pytest_discover_instances then
+    pytest.augment_positions(python, get_script(), path, positions, root)
   end
 
   return positions
