@@ -16,7 +16,7 @@ end
 local dap_args
 local is_test_file = base.is_test_file
 
-local function get_strategy_config(strategy, python, program, args)
+local function get_strategy_config(strategy, python, program, args, env)
   local config = {
     dap = function()
       return vim.tbl_extend("keep", {
@@ -27,6 +27,7 @@ local function get_strategy_config(strategy, python, program, args)
         program = program,
         cwd = async.fn.getcwd(),
         args = args,
+        env = env,
       }, dap_args or {})
     end,
   }
@@ -149,7 +150,8 @@ function PythonNeotestAdapter.build_spec(args)
     python_script,
     script_args,
   })
-  local strategy_config = get_strategy_config(args.strategy, python, python_script, script_args)
+  local env = { PYTHONPATH = base.get_python_path(position.path, vim.loop.cwd()) }
+  local strategy_config = get_strategy_config(args.strategy, python, python_script, script_args, env)
   ---@type neotest.RunSpec
   return {
     command = command,
@@ -169,6 +171,7 @@ function PythonNeotestAdapter.build_spec(args)
       end
     end,
     strategy = strategy_config,
+    env = env,
   }
 end
 
