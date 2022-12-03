@@ -150,7 +150,7 @@ function PythonNeotestAdapter.build_spec(args)
     python_script,
     script_args,
   })
-  local env = { PYTHONPATH = base.get_python_path(position.path, vim.loop.cwd()) }
+  local env = { PYTHONPATH = base.get_python_path(position.path) }
   local strategy_config = get_strategy_config(args.strategy, python, python_script, script_args, env)
   ---@type neotest.RunSpec
   return {

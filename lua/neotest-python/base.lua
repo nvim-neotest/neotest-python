@@ -2,6 +2,7 @@ local async = require("neotest.async")
 local lib = require("neotest.lib")
 local Path = require("plenary.path")
 local TOML = require("neotest-python.toml")
+local util = require("lspconfig.util")
 
 local M = {}
 
@@ -84,18 +85,18 @@ local function extend(lhs, rhs)
 end
 
 ---@return string
-local function get_python_path(extra_paths)
+local function assemble_python_path(root, extra_paths)
     local env = ""
     local sep = ""
     for _, extra_path in pairs(extra_paths) do
-        env = env .. sep .. extra_path
+        env = env .. sep .. Path:new(root, extra_path).filename
         sep = ":"
     end
     return env
 end
 
 ---@return string
-local function get_python_path_from(pyproject, fname , root)
+local function get_python_path(pyproject_root, pyproject , fname)
   local tool = pyproject.tool
   if not tool then return "" end
   local pyright = tool.pyright
@@ -104,24 +105,32 @@ local function get_python_path_from(pyproject, fname , root)
   if not execution_environments then return "" end
 
   for _, environment in pairs(execution_environments) do
-    local environment_root = Path:new(root, environment.root)
+    local environment_root = Path:new(pyproject_root, environment.root)
     if Path:new(fname):make_relative(environment_root.filename) ~= fname then
       local extra_paths = { environment.root }
       if environment.extraPaths then
         extra_paths = extend(extra_paths, environment.extraPaths)
       end
-      return get_python_path(extra_paths)
+      return assemble_python_path(pyproject_root, extra_paths)
     end
   end
   return ""
 end
 
+local function find_pyproject_root(fname)
+  local is_pyproject = function(path)
+      return Path:new(path, "pyproject.toml"):exists()
+  end
+  return util.search_ancestors(fname, is_pyproject)
+end
+
 ---@return string
-function M.get_python_path(fname, root)
-  if lib.files.exists("pyproject.toml") then
-    io.input("pyproject.toml")
+function M.get_python_path(fname)
+  local pyproject_root = find_pyproject_root(fname)
+  if pyproject_root then
+    io.input(Path:new(pyproject_root, "pyproject.toml").filename)
     local pyproject = TOML.parse(io.read("*all"))
-    return get_python_path_from(pyproject, fname, root)
+    return get_python_path(pyproject_root, pyproject, fname)
   end
   return ""
 end

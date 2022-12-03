@@ -3,7 +3,7 @@
 [Neotest](https://github.com/rcarriga/neotest) adapter for python.
 Supports Pytest and unittest test files.
 
-Requires [nvim-treesitter](https://github.com/nvim-treesitter/nvim-treesitter) and the parser for python.
+Requires [nvim-treesitter](https://github.com/nvim-treesitter/nvim-treesitter) and the parser for python, [lspconfig](https://github.com/neovim/nvim-lspconfig) and [plenary.nvim](https://github.com/nvim-lua/plenary.nvim).
 
 ```lua
 require("neotest").setup({
