@@ -72,11 +72,10 @@ class UnittestNeotestAdapter(NeotestAdapter):
                     if case_id in errs:
                         trace = errs[case_id][2]
                         summary = traceback.extract_tb(trace)
-                        error_line = next(
-                            frame.lineno - 1
-                            for frame in reversed(summary)
-                            if frame.filename == case_file
-                        )
+                        for frame in reversed(summary):
+                            if frame.filename == case_file:
+                                error_line = frame.lineno - 1
+                                break
                     results[case_id] = {
                         "status": NeotestResultStatus.FAILED,
                         "errors": [{"message": message, "line": error_line}],
