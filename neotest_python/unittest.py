@@ -93,7 +93,7 @@ class UnittestNeotestAdapter(NeotestAdapter):
         # Make sure we can import relative to current path
         sys.path.insert(0, os.getcwd())
         # We only get a single case ID as the argument
-        argv = sys.argv[0:1] + self.id_to_unittest_args(args[-1])
+        argv = args[:-1] + self.id_to_unittest_args(args[-1])
         unittest.main(
             module=None,
             argv=argv,
