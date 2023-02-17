@@ -91,9 +91,9 @@ class UnittestNeotestAdapter(NeotestAdapter):
 
         # Make sure we can import relative to current path
         sys.path.insert(0, os.getcwd())
-        
+
         # Prepend an executable name which is just used in output
-        argv = ["neotest-python"] + args[:-1] + self.id_to_unittest_args(args[-1])
+        argv = ["neotest-python"] + self.id_to_unittest_args(args[-1]) + args[:-1]
         unittest.main(
             module=None,
             argv=argv,
