@@ -26,7 +26,7 @@ class UnittestNeotestAdapter(NeotestAdapter):
     def case_id(self, case: "TestCase | TestSuite") -> str:
         return "::".join(self.case_id_elems(case))
 
-    def id_to_unittest_args(self, case_id: str) -> List[str]:
+    def convert_args(self, case_id: str, args: List[str]) -> List[str]:
         """Converts a neotest ID into test specifier for unittest"""
         path, *child_ids = case_id.split("::")
         if not child_ids:
@@ -34,13 +34,13 @@ class UnittestNeotestAdapter(NeotestAdapter):
                 # Test files can be passed directly to unittest
                 return [path]
             # Directories need to be run via the 'discover' argument
-            return ["discover", "-s", path]
+            return ["discover", "-s", path, *args]
 
         # Otherwise, convert the ID into a dotted path, relative to current dir
         relative_file = os.path.relpath(path, os.getcwd())
         relative_stem = os.path.splitext(relative_file)[0]
         relative_dotted = relative_stem.replace(os.sep, ".")
-        return [".".join([relative_dotted, *child_ids])]
+        return [*args, ".".join([relative_dotted, *child_ids])]
 
     # TODO: Stream results
     def run(self, args: List[str], _) -> Dict:
@@ -93,7 +93,7 @@ class UnittestNeotestAdapter(NeotestAdapter):
         sys.path.insert(0, os.getcwd())
 
         # Prepend an executable name which is just used in output
-        argv = ["neotest-python"] + self.id_to_unittest_args(args[-1]) + args[:-1]
+        argv = ["neotest-python"] + self.convert_args(args[-1], args[:-1])
         unittest.main(
             module=None,
             argv=argv,
