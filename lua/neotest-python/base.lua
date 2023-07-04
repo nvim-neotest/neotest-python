@@ -56,7 +56,7 @@ function M.get_python_command(root)
   if lib.files.exists("pyproject.toml") then
     local success, exit_code, data = pcall(
       lib.process.run,
-      { "poetry", "env", "info", "-p" },
+      { "poetry", "run", "poetry", "env", "info", "-p" },
       { stdout = true }
     )
     if success and exit_code == 0 then
