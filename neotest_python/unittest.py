@@ -17,6 +17,8 @@ class UnittestNeotestAdapter(NeotestAdapter):
         return str(Path(inspect.getmodule(case).__file__).absolute())  # type: ignore
 
     def case_id_elems(self, case) -> List[str]:
+        if case.__class__.__name__ == '_SubTest':
+            case = case.test_case
         file = self.case_file(case)
         elems = [file, case.__class__.__name__]
         if isinstance(case, TestCase):
