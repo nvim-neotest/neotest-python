@@ -38,6 +38,12 @@ class UnittestNeotestAdapter(NeotestAdapter):
 
         # Otherwise, convert the ID into a dotted path, relative to current dir
         relative_file = os.path.relpath(path, os.getcwd())
+        path_header = os.path.dirname(relative_file)
+        if '.' in os.path.split(path_header)[0]:
+            os.chdir(os.path.dirname(path))
+            sys.path.insert(0, os.getcwd())
+            _argv = ".".join([os.path.splitext(os.path.basename(relative_file))[0] , *child_ids])
+            return [*args,_argv]        
         relative_stem = os.path.splitext(relative_file)[0]
         relative_dotted = relative_stem.replace(os.sep, ".")
         return [*args, ".".join([relative_dotted, *child_ids])]
