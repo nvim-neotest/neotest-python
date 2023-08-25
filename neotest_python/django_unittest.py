@@ -14,9 +14,10 @@ from django.test.runner import DiscoverRunner
 from .base import NeotestAdapter, NeotestError, NeotestResultStatus
 
 
-class DjangoNeotestAdapter(NeotestAdapter):
+class CaseUtilsMixin:
     def case_file(self, case) -> str:
-        return str(Path(inspect.getmodule(case).__file__).absolute())  # type: ignore
+        # type: ignore
+        return str(Path(inspect.getmodule(case).__file__).absolute())
 
     def case_id_elems(self, case) -> List[str]:
         file = self.case_file(case)
@@ -28,6 +29,8 @@ class DjangoNeotestAdapter(NeotestAdapter):
     def case_id(self, case: "TestCase | TestSuite") -> str:
         return "::".join(self.case_id_elems(case))
 
+
+class DjangoNeotestAdapter(CaseUtilsMixin, NeotestAdapter):
     def convert_args(self, case_id: str, args: List[str]) -> List[str]:
         """Converts a neotest ID into test specifier for unittest"""
         path, *child_ids = case_id.split("::")
@@ -44,7 +47,7 @@ class DjangoNeotestAdapter(NeotestAdapter):
         errs: Dict[str, Tuple[Exception, Any, TracebackType]] = {}
         results = {}
 
-        class NeotestTextTestResult(TextTestResult):
+        class NeotestTextTestResult(CaseUtilsMixin, TextTestResult):
             def addFailure(_, test: TestCase, err) -> None:
                 errs[self.case_id(test)] = err
                 return super().addFailure(test, err)
@@ -58,7 +61,7 @@ class DjangoNeotestAdapter(NeotestAdapter):
                     "status": NeotestResultStatus.PASSED,
                 }
 
-        class DjangoUnittestRunner(DiscoverRunner):
+        class DjangoUnittestRunner(CaseUtilsMixin, DiscoverRunner):
             def __init__(self, *args, **kwargs):
                 # env variable DJANGO_SETTINGS_MODULE need to be set
                 django_setup()
