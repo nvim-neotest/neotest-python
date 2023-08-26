@@ -29,13 +29,6 @@ class UnittestNeotestAdapter(NeotestAdapter):
     def convert_args(self, case_id: str, args: List[str]) -> List[str]:
         """Converts a neotest ID into test specifier for unittest"""
         path, *child_ids = case_id.split("::")
-        if not child_ids:
-            if os.path.isfile(path):
-                # Test files can be passed directly to unittest
-                return [path]
-            # Directories need to be run via the 'discover' argument
-            return ["discover", "-s", path, *args]
-
         # Otherwise, convert the ID into a dotted path, relative to current dir
         relative_file = os.path.relpath(path, os.getcwd())
         path_header = os.path.dirname(relative_file)
