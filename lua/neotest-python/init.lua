@@ -138,7 +138,7 @@ function PythonNeotestAdapter.build_spec(args)
     "--runner",
     runner,
     "--",
-    vim.list_extend(get_args(runner, position), args.extra_args or {}),
+    vim.list_extend(get_args(runner, position, args.strategy), args.extra_args or {}),
   })
   if position then
     table.insert(script_args, position.id)
