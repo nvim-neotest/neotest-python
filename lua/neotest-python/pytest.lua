@@ -46,7 +46,7 @@ local function has_parametrize(path)
 end
 
 ---@async
----Launch an async job to discover test instances for path (by running script using python)
+---Discover test instances for path (by running script using python)
 ---@param python string[]
 ---@param script string
 ---@param path string
