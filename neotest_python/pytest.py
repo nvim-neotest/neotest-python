@@ -106,6 +106,7 @@ class NeotestResultCollector:
         if getattr(item, "callspec", None) is not None:
             # Parametrized test
             msg_prefix = f"[{item.callspec.id}] "
+            pos_id += f"[{item.callspec.id}]"
         if report.outcome == "failed":
             exc_repr = report.longrepr
             # Test fails due to condition outside of test e.g. xfail
@@ -176,3 +177,7 @@ class NeotestDebugpyPlugin:
             py_db.stop_on_unhandled_exception(py_db, thread, additional_info, excinfo)
         finally:
             additional_info.is_tracing -= 1
+
+
+def collect(args):
+    pytest.main(['--collect-only', '-q'] + args)

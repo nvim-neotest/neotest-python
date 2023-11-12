@@ -38,7 +38,9 @@ require("neotest").setup({
         is_test_file = function(file_path)
           ...
         end,
-        
+        -- !!EXPERIMENTAL!! Enable shelling out to `pytest` to discover test
+        -- instances for files containing a parametrize mark (default: false)
+        pytest_discover_instances = true,
     })
   }
 })

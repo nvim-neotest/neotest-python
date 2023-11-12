@@ -1,6 +1,7 @@
 local async = require("neotest.async")
 local lib = require("neotest.lib")
 local base = require("neotest-python.base")
+local pytest = require("neotest-python.pytest")
 
 local function get_script()
   local paths = vim.api.nvim_get_runtime_file("neotest.py", true)
@@ -15,6 +16,7 @@ end
 
 local dap_args
 local is_test_file = base.is_test_file
+local pytest_discover_instances = false
 
 local function get_strategy_config(strategy, python, program, args)
   local config = {
@@ -80,8 +82,13 @@ function PythonNeotestAdapter.filter_dir(name)
 end
 
 ---@async
----@return Tree | nil
+---@return neotest.Tree | nil
 function PythonNeotestAdapter.discover_positions(path)
+  local root = PythonNeotestAdapter.root(path) or vim.loop.cwd()
+  local python = get_python(root)
+  local runner = get_runner(python)
+
+  -- Parse the file while pytest is running
   local query = [[
     ;; Match undecorated functions
     ((function_definition
@@ -109,12 +116,15 @@ function PythonNeotestAdapter.discover_positions(path)
      (#not-has-parent? @namespace.definition decorated_definition)
     )
   ]]
-  local root = PythonNeotestAdapter.root(path)
-  local python = get_python(root)
-  local runner = get_runner(python)
-  return lib.treesitter.parse_positions(path, query, {
+  local positions = lib.treesitter.parse_positions(path, query, {
     require_namespaces = runner == "unittest",
   })
+
+  if runner == "pytest" and pytest_discover_instances then
+    pytest.augment_positions(python, get_script(), path, positions, root)
+  end
+
+  return positions
 end
 
 ---@async
@@ -231,6 +241,9 @@ setmetatable(PythonNeotestAdapter, {
     end
     if type(opts.dap) == "table" then
       dap_args = opts.dap
+    end
+    if opts.pytest_discover_instances ~= nil then
+      pytest_discover_instances = opts.pytest_discover_instances
     end
     return PythonNeotestAdapter
   end,
