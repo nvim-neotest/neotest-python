@@ -180,4 +180,4 @@ class NeotestDebugpyPlugin:
 
 
 def collect(args):
-    pytest.main(['--collect-only', '-q'] + args)
+    pytest.main(["--collect-only", "--verbosity=0", "-q"] + args)
