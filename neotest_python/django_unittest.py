@@ -4,10 +4,11 @@ import os
 import sys
 import traceback
 import unittest
+from argparse import ArgumentParser
 from pathlib import Path
 from types import TracebackType
-from typing import Any, Tuple, Callable, Dict, List
-from unittest import TestCase, TestSuite
+from typing import Any, Tuple, Dict, List
+from unittest import TestCase
 from unittest.runner import TextTestResult
 from django import setup as django_setup
 from django.test.runner import DiscoverRunner
@@ -16,7 +17,6 @@ from .base import NeotestAdapter, NeotestError, NeotestResultStatus
 
 class CaseUtilsMixin:
     def case_file(self, case) -> str:
-        # type: ignore
         return str(Path(inspect.getmodule(case).__file__).absolute())
 
     def case_id_elems(self, case) -> List[str]:
@@ -36,13 +36,11 @@ class DjangoNeotestAdapter(CaseUtilsMixin, NeotestAdapter):
         path, *child_ids = case_id.split("::")
         if not child_ids:
             child_ids = []
-        # Otherwise, convert the ID into a dotted path, relative to current dir
         relative_file = os.path.relpath(path, os.getcwd())
         relative_stem = os.path.splitext(relative_file)[0]
         relative_dotted = relative_stem.replace(os.sep, ".")
         return [*args, ".".join([relative_dotted, *child_ids])]
 
-    # TODO: Stream results
     def run(self, args: List[str], _) -> Dict:
         errs: Dict[str, Tuple[Exception, Any, TracebackType]] = {}
         results = {}
@@ -62,27 +60,31 @@ class DjangoNeotestAdapter(CaseUtilsMixin, NeotestAdapter):
                 }
 
         class DjangoUnittestRunner(CaseUtilsMixin, DiscoverRunner):
-            def __init__(self, *args, **kwargs):
-                # env variable DJANGO_SETTINGS_MODULE need to be set
+            def __init__(self, **kwargs):
                 django_setup()
-                super().__init__(*args, **kwargs)
-                self.resultclass = kwargs.pop("resultclass", None)
+                DiscoverRunner.__init__(self, **kwargs)
 
-            def get_resultclass(self):
-                return (
-                    DebugSQLTextTestResult if self.debug_sql else NeotestTextTestResult
+            @classmethod
+            def add_arguments(cls, parser):
+                DiscoverRunner.add_arguments(parser)
+                parser.add_argument(
+                    "--verbosity",
+                    nargs="?",
+                    default=2
+                )
+                parser.add_argument(
+                    "--failfast",
+                    action="store_true",
                 )
 
-            def run_tests(self, test_labels, extra_tests=None, **kwargs):
-                self.setup_test_environment()
-                old_config = self.setup_databases()
-                suite = self.build_suite(test_labels, extra_tests)
-                result = self.test_runner(
-                    verbosity=self.verbosity,
-                    failfast=self.failfast,
-                    resultclass=self.resultclass,
-                ).run(suite)
-                for case, message in result.failures + result.errors:
+            # override
+            def get_resultclass(self):
+                return NeotestTextTestResult
+
+            def collect_results(self, django_test_results, neotest_results):
+                for case, message in (
+                    django_test_results.failures + django_test_results.errors
+                ):
                     case_id = self.case_id(case)
                     error_line = None
                     case_file = self.case_file(case)
@@ -93,26 +95,38 @@ class DjangoNeotestAdapter(CaseUtilsMixin, NeotestAdapter):
                             if frame.filename == case_file:
                                 error_line = frame.lineno - 1
                                 break
-                    results[case_id] = {
+                    neotest_results[case_id] = {
                         "status": NeotestResultStatus.FAILED,
                         "errors": [{"message": message, "line": error_line}],
                         "short": None,
                     }
-                for case, message in result.skipped:
-                    results[self.case_id(case)] = {
+                for case, message in django_test_results.skipped:
+                    neotest_results[self.case_id(case)] = {
                         "short": None,
                         "status": NeotestResultStatus.SKIPPED,
                         "errors": None,
                     }
-                # result = self.run_suite(suite)
-                self.teardown_databases(old_config)
-                self.teardown_test_environment()
-                return self.suite_result(suite, result)
+
+            # override
+            def suite_result(self, suite, suite_results, **kwargs):
+                """Collect Django test suite results and convert them to Neotest compatible results."""
+                self.collect_results(suite_results, results)
+                return (
+                    len(suite_results.failures)
+                    + len(suite_results.errors)
+                    + len(suite_results.unexpectedSuccesses)
+                )
 
         # Make sure we can import relative to current path
         sys.path.insert(0, os.getcwd())
         # Prepend an executable name which is just used in output
         argv = ["neotest-python"] + self.convert_args(args[-1], args[:-1])
-        runner = DjangoUnittestRunner(resultclass=NeotestTextTestResult, verbosity=2)
-        runner.run_tests(test_labels=[argv[1]])
+        # parse args
+        parser = ArgumentParser()
+        DjangoUnittestRunner.add_arguments(parser)
+        # run tests
+        runner = DjangoUnittestRunner(
+            **vars(parser.parse_args(argv[1:-1]))  # parse plugin config args
+        )
+        runner.run_tests(test_labels=[argv[-1]])  # pass test label
         return results
