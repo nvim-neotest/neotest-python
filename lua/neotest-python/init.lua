@@ -59,10 +59,10 @@ local get_runner = function(python_command)
   if vim_test_runner == "pyunit" then
     return "unittest"
   end
-  if vim_test_runner and lib.func_util.index({ "unittest", "pytest" }, vim_test_runner) then
+  if vim_test_runner and lib.func_util.index({ "unittest", "pytest", "django" }, vim_test_runner) then
     return vim_test_runner
   end
-  local runner = base.module_exists("pytest", python_command) and "pytest" or "unittest"
+  local runner = base.module_exists("pytest", python_command) and "pytest" or base.module_exists("django", python_command) and "django" or "unittest"
   stored_runners[command_str] = runner
   return runner
 end
