@@ -12,11 +12,11 @@ class TestRunner(str, Enum):
     DJANGO = "django"
 
 
-def get_adapter(runner: TestRunner) -> NeotestAdapter:
+def get_adapter(runner: TestRunner, emit_parameterized_ids: bool) -> NeotestAdapter:
     if runner == TestRunner.PYTEST:
         from .pytest import PytestNeotestAdapter
 
-        return PytestNeotestAdapter()
+        return PytestNeotestAdapter(emit_parameterized_ids)
     elif runner == TestRunner.UNITTEST:
         from .unittest import UnittestNeotestAdapter
 
@@ -42,6 +42,11 @@ parser.add_argument(
     required=True,
     help="File to stream result JSON to",
 )
+parser.add_argument(
+    "--emit-parameterized-ids",
+    action="store_true",
+    help="Emit parameterized test ids (pytest only)",
+)
 parser.add_argument("args", nargs="*")
 
 
@@ -49,11 +54,12 @@ def main(argv: List[str]):
     if "--pytest-collect" in argv:
         argv.remove("--pytest-collect")
         from .pytest import collect
+
         collect(argv)
         return
 
     args = parser.parse_args(argv)
-    adapter = get_adapter(TestRunner(args.runner))
+    adapter = get_adapter(TestRunner(args.runner), args.emit_parameterized_ids)
 
     with open(args.stream_file, "w") as stream_file:
 

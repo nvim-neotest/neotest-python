@@ -1,17 +1,19 @@
 import inspect
-import subprocess
 import os
+import subprocess
 import sys
 import traceback
 import unittest
 from argparse import ArgumentParser
 from pathlib import Path
 from types import TracebackType
-from typing import Any, Tuple, Dict, List
+from typing import Any, Dict, List, Tuple
 from unittest import TestCase
 from unittest.runner import TextTestResult
+
 from django import setup as django_setup
 from django.test.runner import DiscoverRunner
+
 from .base import NeotestAdapter, NeotestError, NeotestResultStatus
 
 
@@ -67,11 +69,7 @@ class DjangoNeotestAdapter(CaseUtilsMixin, NeotestAdapter):
             @classmethod
             def add_arguments(cls, parser):
                 DiscoverRunner.add_arguments(parser)
-                parser.add_argument(
-                    "--verbosity",
-                    nargs="?",
-                    default=2
-                )
+                parser.add_argument("--verbosity", nargs="?", default=2)
                 parser.add_argument(
                     "--failfast",
                     action="store_true",
