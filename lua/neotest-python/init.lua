@@ -155,6 +155,8 @@ function PythonNeotestAdapter.build_spec(args)
   if pytest_discover_instances then
     table.insert(script_args, "--emit-parameterized-ids")
   end
+
+  table.insert(script_args, "--")
   vim.list_extend(script_args, get_args(runner, position, args.strategy))
   if args.extra_args then
     vim.list_extend(script_args, args.extra_args)
