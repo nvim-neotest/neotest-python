@@ -2,24 +2,32 @@ from io import StringIO
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Union
 
-from .base import NeotestAdapter, NeotestError, NeotestResult, NeotestResultStatus
-
 import pytest
 from _pytest._code.code import ExceptionRepr
 from _pytest.terminal import TerminalReporter
 
+from .base import NeotestAdapter, NeotestError, NeotestResult, NeotestResultStatus
+
 
 class PytestNeotestAdapter(NeotestAdapter):
+    def __init__(self, emit_parameterized_ids: bool):
+        self.emit_parameterized_ids = emit_parameterized_ids
+
     def run(
         self,
         args: List[str],
         stream: Callable[[str, NeotestResult], None],
     ) -> Dict[str, NeotestResult]:
-        result_collector = NeotestResultCollector(self, stream=stream)
-        pytest.main(args=args, plugins=[
-            result_collector,
-            NeotestDebugpyPlugin(),
-        ])
+        result_collector = NeotestResultCollector(
+            self, stream=stream, emit_parameterized_ids=self.emit_parameterized_ids
+        )
+        pytest.main(
+            args=args,
+            plugins=[
+                result_collector,
+                NeotestDebugpyPlugin(),
+            ],
+        )
         return result_collector.results
 
 
@@ -28,9 +36,11 @@ class NeotestResultCollector:
         self,
         adapter: PytestNeotestAdapter,
         stream: Callable[[str, NeotestResult], None],
+        emit_parameterized_ids: bool,
     ):
         self.stream = stream
         self.adapter = adapter
+        self.emit_parameterized_ids = emit_parameterized_ids
 
         self.pytest_config: Optional["pytest.Config"] = None  # type: ignore
         self.results: Dict[str, NeotestResult] = {}
@@ -80,7 +90,9 @@ class NeotestResultCollector:
         self.pytest_config = config
 
     @pytest.hookimpl(hookwrapper=True)
-    def pytest_runtest_makereport(self, item: "pytest.Item", call: "pytest.CallInfo") -> None:
+    def pytest_runtest_makereport(
+        self, item: "pytest.Item", call: "pytest.CallInfo"
+    ) -> None:
         # pytest generates the report.outcome field in its internal
         # pytest_runtest_makereport implementation, so call it first.  (We don't
         # implement pytest_runtest_logreport because it doesn't have access to
@@ -105,8 +117,10 @@ class NeotestResultCollector:
         msg_prefix = ""
         if getattr(item, "callspec", None) is not None:
             # Parametrized test
-            msg_prefix = f"[{item.callspec.id}] "
-            pos_id += f"[{item.callspec.id}]"
+            if self.emit_parameterized_ids:
+                pos_id += f"[{item.callspec.id}]"
+            else:
+                msg_prefix = f"[{item.callspec.id}] "
         if report.outcome == "failed":
             exc_repr = report.longrepr
             # Test fails due to condition outside of test e.g. xfail
@@ -119,7 +133,9 @@ class NeotestResultCollector:
                 for traceback_entry in reversed(call.excinfo.traceback):
                     if str(traceback_entry.path) == abs_path:
                         error_line = traceback_entry.lineno
-                errors.append({"message": msg_prefix + error_message, "line": error_line})
+                errors.append(
+                    {"message": msg_prefix + error_message, "line": error_line}
+                )
             else:
                 # TODO: Figure out how these are returned and how to represent
                 raise Exception(
@@ -159,6 +175,7 @@ class NeotestDebugpyPlugin:
         """
         # Reference: https://github.com/microsoft/debugpy/issues/723
         import threading
+
         try:
             import pydevd
         except ImportError:

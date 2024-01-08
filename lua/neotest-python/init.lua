@@ -59,10 +59,14 @@ local get_runner = function(python_command)
   if vim_test_runner == "pyunit" then
     return "unittest"
   end
-  if vim_test_runner and lib.func_util.index({ "unittest", "pytest" }, vim_test_runner) then
+  if
+      vim_test_runner and lib.func_util.index({ "unittest", "pytest", "django" }, vim_test_runner)
+  then
     return vim_test_runner
   end
-  local runner = base.module_exists("pytest", python_command) and "pytest" or "unittest"
+  local runner = base.module_exists("pytest", python_command) and "pytest"
+      or base.module_exists("django", python_command) and "django"
+      or "unittest"
   stored_runners[command_str] = runner
   return runner
 end
@@ -71,7 +75,7 @@ end
 local PythonNeotestAdapter = { name = "neotest-python" }
 
 PythonNeotestAdapter.root =
-  lib.files.match_root_pattern("pyproject.toml", "setup.cfg", "mypy.ini", "pytest.ini", "setup.py")
+    lib.files.match_root_pattern("pyproject.toml", "setup.cfg", "mypy.ini", "pytest.ini", "setup.py")
 
 function PythonNeotestAdapter.is_test_file(file_path)
   return is_test_file(file_path)
@@ -147,9 +151,17 @@ function PythonNeotestAdapter.build_spec(args)
     stream_path,
     "--runner",
     runner,
-    "--",
-    vim.list_extend(get_args(runner, position, args.strategy), args.extra_args or {}),
   })
+  if pytest_discover_instances then
+    table.insert(script_args, "--emit-parameterized-ids")
+  end
+
+  table.insert(script_args, "--")
+  vim.list_extend(script_args, get_args(runner, position, args.strategy))
+  if args.extra_args then
+    vim.list_extend(script_args, args.extra_args)
+  end
+
   if position then
     table.insert(script_args, position.id)
   end

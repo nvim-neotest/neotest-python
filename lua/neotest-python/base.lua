@@ -17,7 +17,7 @@ M.module_exists = function(module, python_command)
   return lib.process.run(vim.tbl_flatten({
     python_command,
     "-c",
-    "import imp; imp.find_module('" .. module .. "')",
+    "import " .. module,
   })) == 0
 end
 
