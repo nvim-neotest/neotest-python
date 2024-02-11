@@ -1,3 +1,4 @@
+import json
 from io import StringIO
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Union
@@ -7,6 +8,11 @@ from _pytest._code.code import ExceptionRepr
 from _pytest.terminal import TerminalReporter
 
 from .base import NeotestAdapter, NeotestError, NeotestResult, NeotestResultStatus
+
+
+def pytest_collection_modifyitems(config):
+    config = {"python_functions": config.getini("python_functions")[0]}
+    print(f"\n{json.dumps(config)}\n")
 
 
 class PytestNeotestAdapter(NeotestAdapter):
