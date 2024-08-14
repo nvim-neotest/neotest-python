@@ -5,6 +5,7 @@ from typing import Callable, Dict, List, Optional, Union
 import pytest
 from _pytest._code.code import ExceptionRepr
 from _pytest.terminal import TerminalReporter
+from _pytest.fixtures import FixtureLookupErrorRepr
 
 from .base import NeotestAdapter, NeotestError, NeotestResult, NeotestResultStatus
 
@@ -100,8 +101,9 @@ class NeotestResultCollector:
         outcome = yield
         report = outcome.get_result()
 
-        if report.when != "call" and not (
-            report.outcome == "skipped" and report.when == "setup"
+        if not (
+            report.when == "call"
+            or (report.when == "setup" and report.outcome in ("skipped", "failed"))
         ):
             return
 
@@ -135,6 +137,13 @@ class NeotestResultCollector:
                         error_line = traceback_entry.lineno
                 errors.append(
                     {"message": msg_prefix + error_message, "line": error_line}
+                )
+            elif isinstance(exc_repr, FixtureLookupErrorRepr):
+                errors.append(
+                    {
+                        "message": msg_prefix + exc_repr.errorstring,
+                        "line": exc_repr.firstlineno,
+                    }
                 )
             else:
                 # TODO: Figure out how these are returned and how to represent
