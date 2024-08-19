@@ -96,8 +96,7 @@ return function(config)
       local strategy_config
       if args.strategy == "dap" then
         strategy_config =
-            base.create_dap_config(python_command, script_path, script_args, config.dap_args)
-        P(config, strategy_config)
+          base.create_dap_config(python_command, script_path, script_args, config.dap_args)
       end
       ---@type neotest.RunSpec
       return {
