@@ -42,7 +42,7 @@ local function has_parametrize(path)
   local content = lib.files.read(path)
   local ts_root, lang = lib.treesitter.get_parse_root(path, content, { fast = true })
   local built_query = lib.treesitter.normalise_query(lang, query)
-  return built_query:iter_matches(ts_root, content)() ~= nil
+  return built_query:iter_matches(ts_root, content, _, _, { all = false })() ~= nil
 end
 
 ---@async
