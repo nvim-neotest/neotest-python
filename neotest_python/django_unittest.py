@@ -70,10 +70,11 @@ class DjangoNeotestAdapter(CaseUtilsMixin, NeotestAdapter):
             def add_arguments(cls, parser):
                 DiscoverRunner.add_arguments(parser)
                 parser.add_argument("--verbosity", nargs="?", default=2)
-                parser.add_argument(
-                    "--failfast",
-                    action="store_true",
-                )
+                if "failfast" not in parser.parse_args([]):
+                    parser.add_argument(
+                        "--failfast",
+                        action="store_true",
+                    )
 
             # override
             def get_resultclass(self):
