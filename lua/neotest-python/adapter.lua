@@ -50,16 +50,22 @@ return function(config)
     return script_args
   end
 
+  local function get_root(path)
+    return base.get_root(path) or vim.loop.cwd() or ""
+  end
+
+  local function filter_dir(name)
+    return name ~= "venv"
+  end
+
   ---@type neotest.Adapter
   return {
     name = "neotest-python",
-    root = base.get_root,
-    filter_dir = function(name)
-      return name ~= "venv"
-    end,
+    root = get_root,
+    filter_dir = filter_dir,
     is_test_file = config.is_test_file,
     discover_positions = function(path)
-      local root = base.get_root(path) or vim.loop.cwd() or ""
+      local root = get_root(path)
 
       local python_command = config.get_python_command(root)
       local runner = config.get_runner(python_command)
@@ -79,8 +85,7 @@ return function(config)
     build_spec = function(args)
       local position = args.tree:data()
 
-      local root = base.get_root(position.path) or vim.loop.cwd() or ""
-
+      local root = get_root(position.path)
       local python_command = config.get_python_command(root)
       local runner = config.get_runner(python_command)
 
