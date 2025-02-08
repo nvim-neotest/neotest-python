@@ -8,6 +8,8 @@ local create_adapter = require("neotest-python.adapter")
 ---@field python? string|string[]|fun(root: string):string[]
 ---@field args? string[]|fun(runner: string, position: neotest.Position, strategy: string): string[]
 ---@field runner? string|fun(python_command: string[]): string
+---@field use_docker? boolean
+---@field containers? [string, string]
 
 local is_callable = function(obj)
   return type(obj) == "function" or (type(obj) == "table" and obj.__call)
@@ -56,6 +58,18 @@ local augment_config = function(config)
     end
   end
 
+  get_container = function(root)
+      if config.containers then
+        for k, v in pairs(config.containers) do
+            print(k)
+            if string.find(vim.loop.cwd(), '/'..k) then
+                return v
+            end
+        end
+      end
+    return ''
+  end
+
   ---@type neotest-python._AdapterConfig
   return {
     pytest_discovery = config.pytest_discover_instances,
@@ -64,6 +78,8 @@ local augment_config = function(config)
     get_args = get_args,
     is_test_file = config.is_test_file or base.is_test_file,
     get_python_command = get_python_command,
+    use_docker = config.use_docker or false,
+    get_container = get_container,
   }
 end
 

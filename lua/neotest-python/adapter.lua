@@ -1,3 +1,4 @@
+local Path = require("plenary.path")
 local nio = require("nio")
 local lib = require("neotest.lib")
 local pytest = require("neotest-python.pytest")
@@ -10,6 +11,8 @@ local base = require("neotest-python.base")
 ---@field get_python_command fun(root: string):string[]
 ---@field get_args fun(runner: string, position: neotest.Position, strategy: string): string[]
 ---@field get_runner fun(python_command: string[]): string
+---@field use_docker? boolean
+---@field get_container fun(): string
 
 ---@param config neotest-python._AdapterConfig
 ---@return neotest.Adapter
@@ -50,6 +53,32 @@ return function(config)
     return script_args
   end
 
+  ---@param run_args neotest.RunArgs
+  ---@param results_path string
+  ---@param runner string
+  ---@return string[]
+  local function build_docker_args(run_args, results_path, runner)
+    local script_args = { "exec" , config.get_container(), "pytest", "--json="..results_path }
+
+    local position = run_args.tree:data()
+
+    vim.list_extend(script_args, config.get_args(runner, position, run_args.strategy))
+
+    if run_args.extra_args then
+      vim.list_extend(script_args, run_args.extra_args)
+    end
+
+    if position then
+      local relpath = Path:new(position.path):make_relative(vim.loop.cwd())
+      table.insert(script_args, relpath)
+      if position.type == "test" then
+        vim.list_extend(script_args, {'-k', position.name})
+      end
+    end
+
+    return script_args
+  end
+
   ---@type neotest.Adapter
   return {
     name = "neotest-python",
@@ -77,27 +106,37 @@ return function(config)
     ---@param args neotest.RunArgs
     ---@return neotest.RunSpec
     build_spec = function(args)
+      local python_command
+      local results_path
+      local script_args
+      local script_path
+
       local position = args.tree:data()
-
       local root = base.get_root(position.path) or vim.loop.cwd() or ""
-
-      local python_command = config.get_python_command(root)
-      local runner = config.get_runner(python_command)
-
-      local results_path = nio.fn.tempname()
       local stream_path = nio.fn.tempname()
       lib.files.write(stream_path, "")
 
       local stream_data, stop_stream = lib.files.stream_lines(stream_path)
 
-      local script_args = build_script_args(args, results_path, stream_path, runner)
-      local script_path = base.get_script_path()
+      if config.use_docker == false then
+        python_command = config.get_python_command(root)
+        local runner = config.get_runner(python_command)
+
+        results_path = nio.fn.tempname()
+        script_args = build_script_args(args, results_path, stream_path, runner)
+        script_path = base.get_script_path()
+      else
+        python_command = {"docker"}
+        script_path = "container"
+        results_path = "report.json"
+        script_args = build_docker_args(args, results_path, "docker")
+      end
 
       local strategy_config
       if args.strategy == "dap" then
-        strategy_config =
-          base.create_dap_config(python_command, script_path, script_args, config.dap_args)
+        strategy_config = base.create_dap_config(python_command, script_path, script_args, config.dap_args)
       end
+
       ---@type neotest.RunSpec
       return {
         command = vim.iter({ python_command, script_path, script_args }):flatten():totable(),
@@ -122,16 +161,41 @@ return function(config)
     ---@param spec neotest.RunSpec
     ---@param result neotest.StrategyResult
     ---@return neotest.Result[]
-    results = function(spec, result)
+    results = function(spec, result, tree)
+      local results = {}
       spec.context.stop_stream()
       local success, data = pcall(lib.files.read, spec.context.results_path)
       if not success then
         data = "{}"
       end
-      local results = vim.json.decode(data, { luanil = { object = true } })
-      for _, pos_result in pairs(results) do
-        result.output_path = pos_result.output_path
+      local report = vim.json.decode(data, { luanil = { object = true } })
+
+      -- Native pytest execution
+      if config.use_docker == false then
+        for _, pos_result in pairs(results) do
+          result.output_path = pos_result.output_path
+        end
+
+      -- docker delegated executionù
+      else
+        -- the path must be recomposed because docker has no the same absolute path
+        local path = vim.loop.cwd()
+
+        for _, v in pairs(report['report']['tests']) do
+          if v['outcome'] == 'failed' then
+            results[path .. "/" .. v['name']] = {
+              status = v['outcome'],
+              short = v['call']['longrepr']
+            }
+          else
+            results[path .. "/" .. v['name']] = {
+              status = v['outcome'],
+              short = ""
+            }
+          end
+        end
       end
+
       return results
     end,
   }
