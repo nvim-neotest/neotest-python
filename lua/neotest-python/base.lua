@@ -159,4 +159,9 @@ function M.get_runner(python_path)
   return runner
 end
 
+function M.get_container()
+  -- Unknown container error will be throw if the field "container" is not defined in configuration
+  return ''
+end
+
 return M

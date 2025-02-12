@@ -41,6 +41,12 @@ require("neotest").setup({
         -- !!EXPERIMENTAL!! Enable shelling out to `pytest` to discover test
         -- instances for files containing a parametrize mark (default: false)
         pytest_discover_instances = true,
+        -- Allow redirection of pytest execution inside a docker container
+        -- !! Only pytest is supported [and](and) requires installation of pytest-json package inside the container
+        use_docker = false,
+        -- The name of the docker to use for execution.
+        -- Can also be a function to return dynamic value.
+        containers = "docker-name-1",
     })
   }
 })
