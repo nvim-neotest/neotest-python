@@ -58,7 +58,7 @@ return function(config)
   ---@param runner string
   ---@return string[]
   local function build_docker_args(run_args, results_path, runner)
-    local script_args = { "exec" , config.get_container(), "pytest", "--json="..results_path }
+    local script_args = { "exec" , config.get_container(), runner, "--json="..results_path }
 
     local position = run_args.tree:data()
 
@@ -106,7 +106,7 @@ return function(config)
     ---@param args neotest.RunArgs
     ---@return neotest.RunSpec
     build_spec = function(args)
-      local python_command
+      local command
       local results_path
       local script_args
       local script_path
@@ -117,29 +117,29 @@ return function(config)
       lib.files.write(stream_path, "")
 
       local stream_data, stop_stream = lib.files.stream_lines(stream_path)
+      local runner = config.get_runner(command)
 
       if config.use_docker == false then
-        python_command = config.get_python_command(root)
-        local runner = config.get_runner(python_command)
+        command = config.get_python_command(root)
 
         results_path = nio.fn.tempname()
         script_args = build_script_args(args, results_path, stream_path, runner)
         script_path = base.get_script_path()
       else
-        python_command = {"docker"}
+        command = {"docker"}
         script_path = "container"
         results_path = "report.json"
-        script_args = build_docker_args(args, results_path, "docker")
+        script_args = build_docker_args(args, results_path, runner)
       end
 
       local strategy_config
       if args.strategy == "dap" then
-        strategy_config = base.create_dap_config(python_command, script_path, script_args, config.dap_args)
+        strategy_config = base.create_dap_config(command, script_path, script_args, config.dap_args)
       end
 
       ---@type neotest.RunSpec
       return {
-        command = vim.iter({ python_command, script_path, script_args }):flatten():totable(),
+        command = vim.iter({ command, script_path, script_args }):flatten():totable(),
         context = {
           results_path = results_path,
           stop_stream = stop_stream,
