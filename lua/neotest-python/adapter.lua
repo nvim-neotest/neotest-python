@@ -11,7 +11,7 @@ local base = require("neotest-python.base")
 ---@field get_python_command fun(root: string):string[]
 ---@field get_args fun(runner: string, position: neotest.Position, strategy: string): string[]
 ---@field get_runner fun(python_command: string[]): string
----@field use_docker? boolean
+---@field use_docker? fun(): boolean
 ---@field get_container fun(): string
 
 ---@param config neotest-python._AdapterConfig
@@ -119,7 +119,7 @@ return function(config)
       local stream_data, stop_stream = lib.files.stream_lines(stream_path)
       local runner = config.get_runner(command)
 
-      if config.use_docker == false then
+      if config.use_docker() == false then
         command = config.get_python_command(root)
 
         results_path = nio.fn.tempname()
@@ -171,7 +171,7 @@ return function(config)
       local report = vim.json.decode(data, { luanil = { object = true } })
 
       -- Native pytest execution
-      if config.use_docker == false then
+      if config.use_docker() == false then
         for _, pos_result in pairs(results) do
           result.output_path = pos_result.output_path
         end
