@@ -64,6 +64,7 @@ class DjangoNeotestAdapter(CaseUtilsMixin, NeotestAdapter):
         class DjangoUnittestRunner(CaseUtilsMixin, DiscoverRunner):
             def __init__(self, **kwargs):
                 django_setup()
+                kwargs["interactive"] = False
                 DiscoverRunner.__init__(self, **kwargs)
 
             @classmethod
