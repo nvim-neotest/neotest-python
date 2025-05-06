@@ -72,6 +72,18 @@ function M.get_python_command(root)
     end
   end
 
+  if lib.files.exists("uv.lock") then
+    local success, exit_code, data = pcall(
+      lib.process.run,
+      { "uv", "run", "python", "-c", "import sys; print(sys.executable)" },
+      { stdout = true }
+    )
+    if success and exit_code == 0 then
+      python_command_mem[root] = { Path:new(data).filename }
+      return python_command_mem[root]
+    end
+  end
+
   -- Fallback to system Python.
   python_command_mem[root] = {
     nio.fn.exepath("python3") or nio.fn.exepath("python") or "python",
@@ -110,7 +122,7 @@ M.treesitter_queries = [[
   ]]
 
 M.get_root =
-    lib.files.match_root_pattern("pyproject.toml", "setup.cfg", "mypy.ini", "pytest.ini", "setup.py")
+  lib.files.match_root_pattern("pyproject.toml", "setup.cfg", "mypy.ini", "pytest.ini", "setup.py")
 
 ---@return string
 function M.get_script_path()
@@ -148,13 +160,13 @@ function M.get_runner(python_path)
     return "unittest"
   end
   if
-      vim_test_runner and lib.func_util.index({ "unittest", "pytest", "django" }, vim_test_runner)
+    vim_test_runner and lib.func_util.index({ "unittest", "pytest", "django" }, vim_test_runner)
   then
     return vim_test_runner
   end
   local runner = M.module_exists("pytest", python_path) and "pytest"
-      or M.module_exists("django", python_path) and "django"
-      or "unittest"
+    or M.module_exists("django", python_path) and "django"
+    or "unittest"
   stored_runners[command_str] = runner
   return runner
 end
