@@ -79,18 +79,56 @@ function M.get_python_command(root)
   return python_command_mem[root]
 end
 
-M.treesitter_queries = [[
+---@return string
+function M.get_script_path()
+  local paths = vim.api.nvim_get_runtime_file("neotest.py", true)
+  for _, path in ipairs(paths) do
+    if vim.endswith(path, ("neotest-python%sneotest.py"):format(lib.files.sep)) then
+      return path
+    end
+  end
+
+  error("neotest.py not found")
+end
+
+---@param python_command string[]
+---@param config neotest-python._AdapterConfig
+---@param runner string
+---@return string
+local function scan_test_function_pattern(runner, config, python_command)
+  local test_function_pattern = "^test"
+  if runner == "pytest" and config.pytest_discovery then
+    local cmd = vim.tbl_flatten({ python_command, M.get_script_path(), "--pytest-extract-test-name-template" })
+    local _, data = lib.process.run(cmd, { stdout = true, stderr = true })
+
+    for line in vim.gsplit(data.stdout, "\n", true) do
+      if string.sub(line, 1, 1) == "{" and string.find(line, "python_functions") ~= nil then
+        local pytest_option = vim.json.decode(line)
+        test_function_pattern = pytest_option.python_functions
+      end
+    end
+  end
+  return test_function_pattern
+end
+
+---@param python_command string[]
+---@param config neotest-python._AdapterConfig
+---@param runner string
+---@return string
+M.treesitter_queries = function(runner, config, python_command)
+  local test_function_pattern = scan_test_function_pattern(runner, config, python_command)
+  return string.format([[
     ;; Match undecorated functions
     ((function_definition
       name: (identifier) @test.name)
-      (#match? @test.name "^test"))
+      (#match? @test.name "%s"))
       @test.definition
 
     ;; Match decorated function, including decorators in definition
     (decorated_definition
       ((function_definition
         name: (identifier) @test.name)
-        (#match? @test.name "^test")))
+        (#match? @test.name "%s")))
         @test.definition
 
     ;; Match decorated classes, including decorators in definition
@@ -107,22 +145,11 @@ M.treesitter_queries = [[
       @namespace.definition
      (#not-has-parent? @namespace.definition decorated_definition)
     )
-  ]]
+  ]], test_function_pattern, test_function_pattern)
+end
 
 M.get_root =
     lib.files.match_root_pattern("pyproject.toml", "setup.cfg", "mypy.ini", "pytest.ini", "setup.py")
-
----@return string
-function M.get_script_path()
-  local paths = vim.api.nvim_get_runtime_file("neotest.py", true)
-  for _, path in ipairs(paths) do
-    if vim.endswith(path, ("neotest-python%sneotest.py"):format(lib.files.sep)) then
-      return path
-    end
-  end
-
-  error("neotest.py not found")
-end
 
 function M.create_dap_config(python_path, script_path, script_args, dap_args)
   return vim.tbl_extend("keep", {
