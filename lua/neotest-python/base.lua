@@ -25,6 +25,7 @@ M.module_exists = function(module, python_command)
 end
 
 local python_command_mem = {}
+local venv_bin = vim.loop.os_uname().sysname:match("Windows") and "Scripts" or "bin"
 
 ---@return string[]
 function M.get_python_command(root)
@@ -34,14 +35,14 @@ function M.get_python_command(root)
   end
   -- Use activated virtualenv.
   if vim.env.VIRTUAL_ENV then
-    python_command_mem[root] = { Path:new(vim.env.VIRTUAL_ENV, "bin", "python").filename }
+    python_command_mem[root] = { Path:new(vim.env.VIRTUAL_ENV, venv_bin, "python").filename }
     return python_command_mem[root]
   end
 
   for _, pattern in ipairs({ "*", ".*" }) do
     local match = nio.fn.glob(Path:new(root or nio.fn.getcwd(), pattern, "pyvenv.cfg").filename)
     if match ~= "" then
-      python_command_mem[root] = { (Path:new(match):parent() / "bin" / "python").filename }
+      python_command_mem[root] = { (Path:new(match):parent() / venv_bin / "python").filename }
       return python_command_mem[root]
     end
   end
@@ -49,7 +50,7 @@ function M.get_python_command(root)
   if lib.files.exists("Pipfile") then
     local success, exit_code, data = pcall(lib.process.run, { "pipenv", "--py" }, { stdout = true })
     if success and exit_code == 0 then
-      local venv = data.stdout:gsub("\n", "")
+      local venv = data.stdout:gsub("\r?\n", "")
       if venv then
         python_command_mem[root] = { Path:new(venv).filename }
         return python_command_mem[root]
@@ -64,9 +65,9 @@ function M.get_python_command(root)
       { stdout = true }
     )
     if success and exit_code == 0 then
-      local venv = data.stdout:gsub("\n", "")
+      local venv = data.stdout:gsub("\r?\n", "")
       if venv then
-        python_command_mem[root] = { Path:new(venv, "bin", "python").filename }
+        python_command_mem[root] = { Path:new(venv, venv_bin, "python").filename }
         return python_command_mem[root]
       end
     end
