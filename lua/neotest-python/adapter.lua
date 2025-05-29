@@ -52,6 +52,7 @@ return function(config)
 
   ---@type neotest.Adapter
   return {
+
     name = "neotest-python",
     root = base.get_root,
     filter_dir = function(name)
@@ -64,12 +65,12 @@ return function(config)
       local python_command = config.get_python_command(root)
       local runner = config.get_runner(python_command)
 
-      local positions = lib.treesitter.parse_positions(path, base.treesitter_queries, {
+      local positions = lib.treesitter.parse_positions(path, base.treesitter_queries(runner, config, python_command), {
         require_namespaces = runner == "unittest",
       })
 
       if runner == "pytest" and config.pytest_discovery then
-        pytest.augment_positions(python_command, base.get_script_path(), path, positions, root)
+        pytest.augment_positions(python_command, base.get_neotest_script_path(), path, positions, root)
       end
 
       return positions
@@ -91,7 +92,7 @@ return function(config)
       local stream_data, stop_stream = lib.files.stream_lines(stream_path)
 
       local script_args = build_script_args(args, results_path, stream_path, runner)
-      local script_path = base.get_script_path()
+      local script_path = base.get_neotest_script_path()
 
       local strategy_config
       if args.strategy == "dap" then
