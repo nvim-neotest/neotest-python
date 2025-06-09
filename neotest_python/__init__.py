@@ -58,6 +58,13 @@ def main(argv: List[str]):
         collect(argv)
         return
 
+    if "--pytest-extract-test-name-template" in argv:
+        argv.remove("--pytest-extract-test-name-template")
+        from .pytest import extract_test_name_template
+
+        extract_test_name_template(argv)
+        return
+
     args = parser.parse_args(argv)
     adapter = get_adapter(TestRunner(args.runner), args.emit_parameterized_ids)
 
