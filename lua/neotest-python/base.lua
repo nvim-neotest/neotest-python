@@ -25,6 +25,7 @@ M.module_exists = function(module, python_command)
 end
 
 local python_command_mem = {}
+local venv_bin = vim.loop.os_uname().sysname:match("Windows") and "Scripts" or "bin"
 
 ---@return string[]
 function M.get_python_command(root)
@@ -34,14 +35,14 @@ function M.get_python_command(root)
   end
   -- Use activated virtualenv.
   if vim.env.VIRTUAL_ENV then
-    python_command_mem[root] = { Path:new(vim.env.VIRTUAL_ENV, "bin", "python").filename }
+    python_command_mem[root] = { Path:new(vim.env.VIRTUAL_ENV, venv_bin, "python").filename }
     return python_command_mem[root]
   end
 
   for _, pattern in ipairs({ "*", ".*" }) do
     local match = nio.fn.glob(Path:new(root or nio.fn.getcwd(), pattern, "pyvenv.cfg").filename)
     if match ~= "" then
-      python_command_mem[root] = { (Path:new(match):parent() / "bin" / "python").filename }
+      python_command_mem[root] = { (Path:new(match):parent() / venv_bin / "python").filename }
       return python_command_mem[root]
     end
   end
@@ -49,7 +50,7 @@ function M.get_python_command(root)
   if lib.files.exists("Pipfile") then
     local success, exit_code, data = pcall(lib.process.run, { "pipenv", "--py" }, { stdout = true })
     if success and exit_code == 0 then
-      local venv = data.stdout:gsub("\n", "")
+      local venv = data.stdout:gsub("\r?\n", "")
       if venv then
         python_command_mem[root] = { Path:new(venv).filename }
         return python_command_mem[root]
@@ -64,11 +65,23 @@ function M.get_python_command(root)
       { stdout = true }
     )
     if success and exit_code == 0 then
-      local venv = data.stdout:gsub("\n", "")
+      local venv = data.stdout:gsub("\r?\n", "")
       if venv then
-        python_command_mem[root] = { Path:new(venv, "bin", "python").filename }
+        python_command_mem[root] = { Path:new(venv, venv_bin, "python").filename }
         return python_command_mem[root]
       end
+    end
+  end
+
+  if lib.files.exists("uv.lock") then
+    local success, exit_code, data = pcall(
+      lib.process.run,
+      { "uv", "run", "python", "-c", "import sys; print(sys.executable)" },
+      { stdout = true }
+    )
+    if success and exit_code == 0 then
+      python_command_mem[root] = { Path:new(data).filename }
+      return python_command_mem[root]
     end
   end
 
@@ -149,7 +162,7 @@ M.treesitter_queries = function(runner, config, python_command)
 end
 
 M.get_root =
-    lib.files.match_root_pattern("pyproject.toml", "setup.cfg", "mypy.ini", "pytest.ini", "setup.py")
+  lib.files.match_root_pattern("pyproject.toml", "setup.cfg", "mypy.ini", "pytest.ini", "setup.py")
 
 function M.create_dap_config(python_path, script_path, script_args, dap_args)
   return vim.tbl_extend("keep", {
@@ -175,13 +188,13 @@ function M.get_runner(python_path)
     return "unittest"
   end
   if
-      vim_test_runner and lib.func_util.index({ "unittest", "pytest", "django" }, vim_test_runner)
+    vim_test_runner and lib.func_util.index({ "unittest", "pytest", "django" }, vim_test_runner)
   then
     return vim_test_runner
   end
   local runner = M.module_exists("pytest", python_path) and "pytest"
-      or M.module_exists("django", python_path) and "django"
-      or "unittest"
+    or M.module_exists("django", python_path) and "django"
+    or "unittest"
   stored_runners[command_str] = runner
   return runner
 end
