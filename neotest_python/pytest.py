@@ -1,4 +1,5 @@
 from io import StringIO
+import json
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Union
 
@@ -203,6 +204,17 @@ class NeotestDebugpyPlugin:
             py_db.stop_on_unhandled_exception(py_db, thread, additional_info, excinfo)
         finally:
             additional_info.is_tracing -= 1
+
+
+class TestNameTemplateExtractor:
+    @staticmethod
+    def pytest_collection_modifyitems(config):
+        config = {"python_functions": config.getini("python_functions")[0]}
+        print(f"\n{json.dumps(config)}\n")
+
+
+def extract_test_name_template(args):
+    pytest.main(args=["-k", "neotest_none"], plugins=[TestNameTemplateExtractor])
 
 
 def collect(args):
