@@ -1,9 +1,7 @@
 import inspect
 import os
-import subprocess
 import sys
 import traceback
-import unittest
 from argparse import ArgumentParser
 from pathlib import Path
 from types import TracebackType
@@ -55,7 +53,6 @@ class DjangoNeotestAdapter(CaseUtilsMixin, NeotestAdapter):
         relative_file = os.path.relpath(path, django_root)
         relative_stem = os.path.splitext(relative_file)[0]
         relative_dotted = relative_stem.replace(os.sep, ".")
-        print(relative_file, relative_stem, relative_dotted)
         return [*args, ".".join([relative_dotted, *child_ids])]
 
     def run(self, args: List[str], _) -> Dict:
