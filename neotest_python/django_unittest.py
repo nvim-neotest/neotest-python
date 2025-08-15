@@ -1,9 +1,7 @@
 import inspect
 import os
-import subprocess
 import sys
 import traceback
-import unittest
 from argparse import ArgumentParser
 from pathlib import Path
 from types import TracebackType
@@ -33,12 +31,26 @@ class CaseUtilsMixin:
 
 
 class DjangoNeotestAdapter(CaseUtilsMixin, NeotestAdapter):
+    def get_django_root(self, path: str) -> Path:
+        """
+        Traverse the file system to locate the nearest manage.py parent
+        from the location of a given path.
+
+        This is the location of the django project
+        """
+        test_file_path = Path(path).resolve()
+        for parent in [test_file_path] + list(test_file_path.parents):
+            if (parent / "manage.py").exists():
+                return parent
+        raise FileNotFoundError("manage.py not found")
+
     def convert_args(self, case_id: str, args: List[str]) -> List[str]:
         """Converts a neotest ID into test specifier for unittest"""
         path, *child_ids = case_id.split("::")
         if not child_ids:
             child_ids = []
-        relative_file = os.path.relpath(path, os.getcwd())
+        django_root = self.get_django_root(path)
+        relative_file = os.path.relpath(path, django_root)
         relative_stem = os.path.splitext(relative_file)[0]
         relative_dotted = relative_stem.replace(os.sep, ".")
         return [*args, ".".join([relative_dotted, *child_ids])]
@@ -117,10 +129,16 @@ class DjangoNeotestAdapter(CaseUtilsMixin, NeotestAdapter):
                     + len(suite_results.unexpectedSuccesses)
                 )
 
-        # Make sure we can import relative to current path
-        sys.path.insert(0, os.getcwd())
+        # Add the location of the django project to system path
+        # to ensure we have the same import paths as if the tests were ran
+        # by manage.py
+        case_id = args[-1]
+        path, *_ = case_id.split("::")
+        manage_py_location = self.get_django_root(path)
+        sys.path.insert(0, str(manage_py_location))
+
         # Prepend an executable name which is just used in output
-        argv = ["neotest-python"] + self.convert_args(args[-1], args[:-1])
+        argv = ["neotest-python"] + self.convert_args(case_id, args[:-1])
         # parse args
         parser = ArgumentParser()
         DjangoUnittestRunner.add_arguments(parser)
