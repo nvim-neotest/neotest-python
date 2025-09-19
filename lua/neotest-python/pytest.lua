@@ -53,7 +53,7 @@ end
 ---@param positions neotest.Tree
 ---@param root string
 local function discover_params(python, script, path, positions, root)
-  local cmd = vim.tbl_flatten({ python, script, "--pytest-collect", path })
+  local cmd = vim.iter({ python, script, "--pytest-collect", path }):flatten():totable()
   logger.debug("Running test instance discovery:", cmd)
 
   local test_params = {}
@@ -66,7 +66,7 @@ local function discover_params(python, script, path, positions, root)
     return {}
   end
 
-  for line in vim.gsplit(data.stdout, "\n", true) do
+  for line in vim.gsplit(data.stdout, "\n", { plain = true }) do
     local param_index = string.find(line, "[", nil, true)
     if param_index then
       local test_id = root .. lib.files.path.sep .. string.sub(line, 1, param_index - 1)
