@@ -72,6 +72,9 @@ class NeotestResultCollector:
         buffer.seek(0)
         return buffer.read()
 
+    def pytest_configure(self, config: "pytest.Config"):
+        self.pytest_config = config
+
     def pytest_deselected(self, items: List["pytest.Item"]):
         for report in items:
             file_path, *name_path = report.nodeid.split("::")
@@ -91,42 +94,33 @@ class NeotestResultCollector:
                 self.stream(pos_id, result)
             self.results[pos_id] = result
 
-    def pytest_cmdline_main(self, config: "pytest.Config"):
-        self.pytest_config = config
-
-    @pytest.hookimpl(hookwrapper=True)
-    def pytest_runtest_makereport(
-        self, item: "pytest.Item", call: "pytest.CallInfo"
-    ) -> None:
-        # pytest generates the report.outcome field in its internal
-        # pytest_runtest_makereport implementation, so call it first.  (We don't
-        # implement pytest_runtest_logreport because it doesn't have access to
-        # call.excinfo.)
-        outcome = yield
-        report = outcome.get_result()
-
+    def pytest_runtest_logreport(self, report: "pytest.TestReport") -> None:
         if not (
             report.when == "call"
             or (report.when == "setup" and report.outcome in ("skipped", "failed"))
         ):
             return
 
-        file_path, *name_path = item.nodeid.split("::")
+        file_path, *name_path = report.nodeid.split("::")
         abs_path = str(Path(self.pytest_config.rootdir, file_path))
         *namespaces, test_name = name_path
         valid_test_name, *params = test_name.split("[")  # ]
+
         pos_id = "::".join([abs_path, *namespaces, valid_test_name])
 
         errors: List[NeotestError] = []
         short = self._get_short_output(self.pytest_config, report)
 
         msg_prefix = ""
-        if getattr(item, "callspec", None) is not None:
-            # Parametrized test
+        param_id = None
+        if "[" in test_name and test_name.endswith("]"):
+            param_id = test_name[len(valid_test_name) + 1 : -1]
+        if param_id:
             if self.emit_parameterized_ids:
-                pos_id += f"[{item.callspec.id}]"
+                pos_id += f"[{param_id}]"
             else:
-                msg_prefix = f"[{item.callspec.id}] "
+                msg_prefix = f"[{param_id}] "
+
         if report.outcome == "failed":
             exc_repr = report.longrepr
             # Test fails due to condition outside of test e.g. xfail
@@ -134,27 +128,42 @@ class NeotestResultCollector:
                 errors.append({"message": msg_prefix + exc_repr, "line": None})
             # Test failed internally
             elif isinstance(exc_repr, ExceptionRepr):
+                # Try to use reprcrash, but ensure the line is 0-based
                 error_message = ANSI_ESCAPE.sub("", exc_repr.reprcrash.message)  # type: ignore
                 error_line = None
-                for traceback_entry in reversed(call.excinfo.traceback):
-                    if str(traceback_entry.path) == abs_path:
-                        error_line = traceback_entry.lineno
+                crash = getattr(exc_repr, "reprcrash", None)
+                if crash:
+                    # Use only if it refers to this test file
+                    crash_path = (
+                        str(Path(crash.path)) if getattr(crash, "path", None) else None
+                    )
+                    if crash_path and (
+                        crash_path == abs_path
+                        or Path(crash_path).resolve() == Path(abs_path).resolve()
+                    ):
+                        try:
+                            # lineno is often 1-based -> convert to 0-based and clamp to >= 0
+                            ln = int(crash.lineno)  # type: ignore
+                            error_line = max(0, ln - 1)
+                        except Exception:
+                            error_line = None
                 errors.append(
                     {"message": msg_prefix + error_message, "line": error_line}
                 )
             elif isinstance(exc_repr, FixtureLookupErrorRepr):
+                line0 = getattr(exc_repr, "firstlineno", None)
+                if isinstance(line0, int):
+                    line0 = max(0, line0 - 1)  # 0-based
                 errors.append(
                     {
                         "message": msg_prefix + exc_repr.errorstring,
-                        "line": exc_repr.firstlineno,
+                        "line": line0,
                     }
                 )
             else:
-                # TODO: Figure out how these are returned and how to represent
-                raise Exception(
-                    f"Unhandled error type ({type(exc_repr)}), please report to"
-                    " neotest-python repo"
-                )
+                # Preserve compatibility with previous behavior
+                errors.append({"message": msg_prefix + str(exc_repr), "line": None})
+
         result: NeotestResult = self.adapter.update_result(
             self.results.get(pos_id),
             {
@@ -199,7 +208,6 @@ class NeotestDebugpyPlugin:
             # Do nothing if not running with a DAP debugger,
             # e.g. neotest was invoked with {strategy = dap}
             return
-
         thread = threading.current_thread()
         additional_info = py_db.set_additional_thread_info(thread)
         additional_info.is_tracing += 1
