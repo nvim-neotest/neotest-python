@@ -75,15 +75,19 @@ class NeotestResultCollector:
     def pytest_configure(self, config: "pytest.Config"):
         self.pytest_config = config
 
+    def _get_abs_path(self, file_path: Union[str, Path]):
+        try:
+            # rootpath is now the preferred way to access root
+            abs_path = str(self.pytest_config.rootpath / file_path)
+        except AttributeError:
+            # fallback to rootdir for older pytest versions
+            abs_path = str(Path(self.pytest_config.rootdir, file_path))
+        return abs_path
+
     def pytest_deselected(self, items: List["pytest.Item"]):
         for report in items:
             file_path, *name_path = report.nodeid.split("::")
-            try:
-                # rootpath is now the preferred way to access root
-                abs_path = str(self.pytest_config.rootpath / file_path)
-            except AttributeError:
-                # fallback to rootdir for older pytest versions
-                abs_path = str(Path(self.pytest_config.rootdir, file_path))
+            abs_path = self._get_abs_path(file_path)
             *namespaces, test_name = name_path
             valid_test_name, *params = test_name.split("[")  # ]
             pos_id = "::".join([abs_path, *(namespaces), valid_test_name])
@@ -133,7 +137,7 @@ class NeotestResultCollector:
             return
 
         file_path, *name_path = report.nodeid.split("::")
-        abs_path = str(self.pytest_config.rootpath / file_path)
+        abs_path = self._get_abs_path(file_path)
         *namespaces, test_name = name_path
         valid_test_name, *params = test_name.split("[")  # ]
 
