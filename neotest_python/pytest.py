@@ -78,7 +78,12 @@ class NeotestResultCollector:
     def pytest_deselected(self, items: List["pytest.Item"]):
         for report in items:
             file_path, *name_path = report.nodeid.split("::")
-            abs_path = str(self.pytest_config.rootpath / file_path)
+            try:
+                # rootpath is now the preferred way to access root
+                abs_path = str(self.pytest_config.rootpath / file_path)
+            except AttributeError:
+                # fallback to rootdir for older pytest versions
+                abs_path = str(Path(self.pytest_config.rootdir, file_path))
             *namespaces, test_name = name_path
             valid_test_name, *params = test_name.split("[")  # ]
             pos_id = "::".join([abs_path, *(namespaces), valid_test_name])
