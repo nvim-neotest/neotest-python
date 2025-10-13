@@ -2,7 +2,7 @@ import json
 import re
 from io import StringIO
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Union
+from typing import Callable, Dict, Generator, List, Optional, Union
 
 import pytest
 from _pytest._code.code import ExceptionRepr
@@ -92,7 +92,33 @@ class NeotestResultCollector:
             )
             if not params:
                 self.stream(pos_id, result)
+
             self.results[pos_id] = result
+
+    @pytest.hookimpl(hookwrapper=True)
+    def pytest_runtest_makereport(
+        self, item: "pytest.Item", call: "pytest.CallInfo"
+    ) -> Generator:
+        outcome = yield
+        report: pytest.TestReport = outcome.get_result()
+
+        if report.when not in {"call", "setup"} or report.outcome != "failed":
+            return
+
+        exc_repr = report.longrepr
+        if not isinstance(exc_repr, ExceptionRepr):
+            return
+
+        file_path, *_ = item.nodeid.split("::")
+        abs_path = str(Path(self.pytest_config.rootdir, file_path))
+        report.error_line = next(
+            (
+                traceback_entry.lineno
+                for traceback_entry in reversed(call.excinfo.traceback)
+                if str(traceback_entry.path) == abs_path
+            ),
+            None,
+        )
 
     def pytest_runtest_logreport(self, report: "pytest.TestReport") -> None:
         if not (
@@ -130,23 +156,8 @@ class NeotestResultCollector:
             elif isinstance(exc_repr, ExceptionRepr):
                 # Try to use reprcrash, but ensure the line is 0-based
                 error_message = ANSI_ESCAPE.sub("", exc_repr.reprcrash.message)  # type: ignore
-                error_line = None
-                crash = getattr(exc_repr, "reprcrash", None)
-                if crash:
-                    # Use only if it refers to this test file
-                    crash_path = (
-                        str(Path(crash.path)) if getattr(crash, "path", None) else None
-                    )
-                    if crash_path and (
-                        crash_path == abs_path
-                        or Path(crash_path).resolve() == Path(abs_path).resolve()
-                    ):
-                        try:
-                            # lineno is often 1-based -> convert to 0-based and clamp to >= 0
-                            ln = int(crash.lineno)  # type: ignore
-                            error_line = max(0, ln - 1)
-                        except Exception:
-                            error_line = None
+                # error_line = report.error_line
+                error_line = getattr(report, "error_line", None)
                 errors.append(
                     {"message": msg_prefix + error_message, "line": error_line}
                 )
