@@ -96,11 +96,11 @@ class UnittestNeotestAdapter(NeotestAdapter):
 
         # Prepend an executable name which is just used in output
         argv = ["neotest-python"] + self.convert_args(args[-1], args[:-1])
-        unittest.main(
+        program = unittest.main(
             module=None,
             argv=argv,
             testRunner=NeotestUnittestRunner(resultclass=NeotestTextTestResult),
             exit=False,
         )
-
-        return results, 0
+        exit_code = 0 if program.result.wasSuccessful() else 1
+        return results, exit_code

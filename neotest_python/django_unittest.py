@@ -146,5 +146,6 @@ class DjangoNeotestAdapter(CaseUtilsMixin, NeotestAdapter):
         runner = DjangoUnittestRunner(
             **vars(parser.parse_args(argv[1:-1]))  # parse plugin config args
         )
-        runner.run_tests(test_labels=[argv[-1]])  # pass test label
-        return results, 0
+        failures = runner.run_tests(test_labels=[argv[-1]])  # pass test label
+        exit_code = 0 if failures == 0 else 1
+        return results, exit_code
