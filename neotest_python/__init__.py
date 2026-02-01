@@ -50,20 +50,18 @@ parser.add_argument(
 parser.add_argument("args", nargs="*")
 
 
-def main(argv: List[str]):
+def main(argv: List[str]) -> int:
     if "--pytest-collect" in argv:
         argv.remove("--pytest-collect")
         from .pytest import collect
 
-        collect(argv)
-        return
+        return collect(argv)
 
     if "--pytest-extract-test-name-template" in argv:
         argv.remove("--pytest-extract-test-name-template")
         from .pytest import extract_test_name_template
 
-        extract_test_name_template(argv)
-        return
+        return extract_test_name_template(argv)
 
     args = parser.parse_args(argv)
     adapter = get_adapter(TestRunner(args.runner), args.emit_parameterized_ids)
@@ -74,7 +72,9 @@ def main(argv: List[str]):
             stream_file.write(json.dumps({"id": pos_id, "result": result}) + "\n")
             stream_file.flush()
 
-        results = adapter.run(args.args, stream)
+        results, exit_code = adapter.run(args.args, stream)
 
     with open(args.results_file, "w") as results_file:
         json.dump(results, results_file)
+
+    return exit_code

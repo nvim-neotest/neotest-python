@@ -2,7 +2,7 @@ import json
 import re
 from io import StringIO
 from pathlib import Path
-from typing import Callable, Dict, Generator, List, Optional, Union
+from typing import Callable, Dict, Generator, List, Optional, Tuple, Union
 
 import pytest
 from _pytest._code.code import ExceptionRepr
@@ -22,18 +22,18 @@ class PytestNeotestAdapter(NeotestAdapter):
         self,
         args: List[str],
         stream: Callable[[str, NeotestResult], None],
-    ) -> Dict[str, NeotestResult]:
+    ) -> Tuple[Dict[str, NeotestResult], int]:
         result_collector = NeotestResultCollector(
             self, stream=stream, emit_parameterized_ids=self.emit_parameterized_ids
         )
-        pytest.main(
+        exit_code = pytest.main(
             args=args,
             plugins=[
                 result_collector,
                 NeotestDebugpyPlugin(),
             ],
         )
-        return result_collector.results
+        return result_collector.results, int(exit_code)
 
 
 class NeotestResultCollector:
@@ -235,9 +235,11 @@ class TestNameTemplateExtractor:
         print(f"\n{json.dumps(config)}\n")
 
 
-def extract_test_name_template(args):
-    pytest.main(args=["-k", "neotest_none"], plugins=[TestNameTemplateExtractor])
+def extract_test_name_template(args) -> int:
+    return int(
+        pytest.main(args=["-k", "neotest_none"], plugins=[TestNameTemplateExtractor])
+    )
 
 
-def collect(args):
-    pytest.main(["--collect-only", "--verbosity=0", "-q"] + args)
+def collect(args) -> int:
+    return int(pytest.main(["--collect-only", "--verbosity=0", "-q"] + args))

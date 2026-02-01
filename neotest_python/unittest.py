@@ -45,7 +45,7 @@ class UnittestNeotestAdapter(NeotestAdapter):
         return [*args, ".".join([relative_dotted, *child_ids])]
 
     # TODO: Stream results
-    def run(self, args: List[str], _) -> Dict:
+    def run(self, args: List[str], _) -> Tuple[Dict, int]:
         results = {}
 
         errs: Dict[str, Tuple[Exception, Any, TracebackType]] = {}
@@ -103,4 +103,4 @@ class UnittestNeotestAdapter(NeotestAdapter):
             exit=False,
         )
 
-        return results
+        return results, 0

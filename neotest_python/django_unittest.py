@@ -55,7 +55,7 @@ class DjangoNeotestAdapter(CaseUtilsMixin, NeotestAdapter):
         relative_dotted = relative_stem.replace(os.sep, ".")
         return [*args, ".".join([relative_dotted, *child_ids])]
 
-    def run(self, args: List[str], _) -> Dict:
+    def run(self, args: List[str], _) -> Tuple[Dict, int]:
         errs: Dict[str, Tuple[Exception, Any, TracebackType]] = {}
         results = {}
 
@@ -147,4 +147,4 @@ class DjangoNeotestAdapter(CaseUtilsMixin, NeotestAdapter):
             **vars(parser.parse_args(argv[1:-1]))  # parse plugin config args
         )
         runner.run_tests(test_labels=[argv[-1]])  # pass test label
-        return results
+        return results, 0
