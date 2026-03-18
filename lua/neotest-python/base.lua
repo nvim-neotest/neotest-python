@@ -164,14 +164,15 @@ end
 M.get_root =
   lib.files.match_root_pattern("pyproject.toml", "setup.cfg", "mypy.ini", "pytest.ini", "setup.py")
 
-function M.create_dap_config(python_path, script_path, script_args, dap_args)
+function M.create_dap_config(python_path, script_path, script_args, cwd, env, dap_args)
   return vim.tbl_extend("keep", {
     type = "python",
     name = "Neotest Debugger",
     request = "launch",
     python = python_path,
     program = script_path,
-    cwd = nio.fn.getcwd(),
+    cwd = cwd or nio.fn.getcwd(),
+    env = env,
     args = script_args,
   }, dap_args or {})
 end
