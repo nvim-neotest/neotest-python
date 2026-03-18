@@ -17,6 +17,23 @@ local function assert_starts_with(actual, prefix, label)
   end
 end
 
+local function assert_contains_sequence(items, sequence, label)
+  for index = 1, #items - #sequence + 1 do
+    local matches = true
+    for offset = 1, #sequence do
+      if items[index + offset - 1] ~= sequence[offset] then
+        matches = false
+        break
+      end
+    end
+    if matches then
+      return
+    end
+  end
+
+  fail(string.format("%s\nexpected sequence: %s\nactual:            %s", label, vim.inspect(sequence), vim.inspect(items)))
+end
+
 local function make_tree(position)
   return {
     data = function()
@@ -35,7 +52,7 @@ local adapter = neotest_python({
   runner = "pytest",
   python = { "python" },
   args = function()
-    return { "-q" }
+    return { "-n", "auto", "-q" }
   end,
   cwd = function(resolved_root)
     return resolved_root
@@ -71,6 +88,11 @@ nio.run(function()
   assert_equal(run_spec.cwd, root, "build_spec should expose configured cwd")
   assert_equal(run_spec.env.TEST_ENV, "set", "build_spec should expose configured env")
   assert_equal(run_spec.env.TEST_POSITION, position.id, "env callback should receive the position")
+  assert_contains_sequence(
+    run_spec.command,
+    { "--", "-n", "auto", "-q" },
+    "build_spec should preserve pytest-xdist arguments"
+  )
 
   assert_starts_with(
     find_arg(run_spec.command, "--results-file"),

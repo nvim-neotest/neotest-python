@@ -95,7 +95,7 @@ end
 
 ---@param mappings table<string, string>
 ---@return string[]
-local function get_sorted_keys(mappings)
+local function build_sorted_keys(mappings)
   local keys = {}
   for k in pairs(mappings) do
     table.insert(keys, k)
@@ -106,17 +106,37 @@ local function get_sorted_keys(mappings)
   return keys
 end
 
+---@param mappings table<string, string>
+---@return string[]
+local function get_forward_keys(mappings)
+  if mappings and mappings.forward_keys then
+    return mappings.forward_keys
+  end
+  return build_sorted_keys(get_forward_mappings(mappings))
+end
+
+---@param mappings table<string, string>
+---@return string[]
+local function get_reverse_keys(mappings)
+  if mappings and mappings.reverse_keys then
+    return mappings.reverse_keys
+  end
+  return build_sorted_keys(get_reverse_mappings(mappings))
+end
+
 ---Normalize path mappings for host->container and container->host translation.
 ---Temp mappings are expanded so a simple `/tmp -> /tmp` config also matches
 ---macOS temp files created under the resolved `$TMPDIR`.
 ---@param raw_mappings table<string, string>|nil
----@return { forward: table<string, string>, reverse: table<string, string> }
+---@return { forward: table<string, string>, reverse: table<string, string>, forward_keys: string[], reverse_keys: string[] }
 function M.normalize_mappings(raw_mappings)
   raw_mappings = raw_mappings or {}
 
   local mappings = {
     forward = {},
     reverse = {},
+    forward_keys = {},
+    reverse_keys = {},
   }
   local temp_roots = get_temp_roots()
   local preferred_temp_root = temp_roots[1]
@@ -139,6 +159,9 @@ function M.normalize_mappings(raw_mappings)
     end
   end
 
+  mappings.forward_keys = build_sorted_keys(mappings.forward)
+  mappings.reverse_keys = build_sorted_keys(mappings.reverse)
+
   return mappings
 end
 
@@ -151,7 +174,7 @@ function M.to_container_path(path, mappings)
     return path
   end
   local forward_mappings = get_forward_mappings(mappings)
-  local sorted_host_paths = get_sorted_keys(forward_mappings)
+  local sorted_host_paths = get_forward_keys(mappings)
   for _, host_path in ipairs(sorted_host_paths) do
     local container_path = forward_mappings[host_path]
     -- Use plain string matching for prefix to avoid regex escaping issues
@@ -188,7 +211,7 @@ function M.to_host_path(path, mappings)
     return path
   end
   local inverse_mappings = get_reverse_mappings(mappings)
-  local sorted_container_paths = get_sorted_keys(inverse_mappings)
+  local sorted_container_paths = get_reverse_keys(mappings)
 
   for _, container_path in ipairs(sorted_container_paths) do
     local host_path = inverse_mappings[container_path]

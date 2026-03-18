@@ -3,6 +3,7 @@ local lib = require("neotest.lib")
 local Path = require("plenary.path")
 
 local M = {}
+local script_path_mem
 
 function M.is_test_file(file_path)
   if not vim.endswith(file_path, ".py") then
@@ -94,10 +95,15 @@ end
 
 ---@return string
 function M.get_script_path()
+  if script_path_mem then
+    return script_path_mem
+  end
+
   local paths = vim.api.nvim_get_runtime_file("neotest.py", true)
   for _, path in ipairs(paths) do
     if vim.endswith(path, ("neotest-python%sneotest.py"):format(lib.files.sep)) then
-      return path
+      script_path_mem = path
+      return script_path_mem
     end
   end
 

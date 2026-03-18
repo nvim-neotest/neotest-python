@@ -58,6 +58,22 @@ require("neotest").setup({
 })
 ```
 
+### Pytest-xdist
+
+`neotest-python` does not require Docker and does not manage worker counts
+itself. If you use `pytest-xdist`, just pass the usual pytest flags through
+`args`:
+
+```lua
+require("neotest-python")({
+  runner = "pytest",
+  args = { "-n", "auto", "--dist", "loadfile" },
+})
+```
+
+Those arguments are forwarded unchanged to pytest, including when running
+through Docker or other remote Python commands.
+
 ### Docker/Remote Integration
 
 To run tests in a Docker container or any remote environment, use the `python`
