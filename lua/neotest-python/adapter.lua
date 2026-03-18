@@ -6,7 +6,7 @@ local path_mapping = require("neotest-python.path_mapping")
 local logger = require("neotest.logging")
 
 ---@class neotest-python._AdapterConfig
----@field dap_args? table
+---@field dap_args? table|fun(root: string, position: neotest.Position, default_config: table, context: table): table
 ---@field pytest_discovery? boolean
 ---@field is_test_file fun(file_path: string):boolean
 ---@field get_python_command fun(root: string):string[]
@@ -124,16 +124,30 @@ return function(config)
       local script_args = build_script_args(args, container_results_path, container_stream_path, runner, mappings)
       local script_path = vim.fn.resolve(base.get_script_path())
       local container_script_path = path_mapping.to_container_path(script_path, mappings)
+      local command = vim.iter({ python_command, container_script_path, script_args }):flatten():totable()
 
       logger.debug("neotest-python: Script Path Host: ", script_path, " Container: ", container_script_path)
 
       local strategy_config
       if args.strategy == "dap" then
-        strategy_config =
-          base.create_dap_config(python_command, script_path, script_args, cwd, env, config.dap_args)
+        strategy_config = base.create_dap_config(python_command, script_path, script_args, cwd, env, config.dap_args, {
+          root = root,
+          position = position,
+          mappings = mappings,
+          command = command,
+          python_command = python_command,
+          script_path = script_path,
+          container_script_path = container_script_path,
+          script_args = script_args,
+          results_path = results_path,
+          stream_path = stream_path,
+          container_results_path = container_results_path,
+          container_stream_path = container_stream_path,
+          cwd = cwd,
+          env = env,
+        })
       end
 
-      local command = vim.iter({ python_command, container_script_path, script_args }):flatten():totable()
       logger.debug("neotest-python: Full Command: ", table.concat(command, " "))
 
       ---@type neotest.RunSpec

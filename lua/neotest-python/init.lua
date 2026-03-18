@@ -2,7 +2,7 @@ local base = require("neotest-python.base")
 local create_adapter = require("neotest-python.adapter")
 
 ---@class neotest-python.AdapterConfig
----@field dap? table
+---@field dap? table|fun(root: string, position: neotest.Position, default_config: table, context: table): table
 ---@field pytest_discover_instances? boolean
 ---@field is_test_file? fun(file_path: string):boolean
 ---@field python? string|string[]|fun(root: string):string[]

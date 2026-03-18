@@ -21,6 +21,9 @@ require("neotest").setup({
       -- Extra arguments for nvim-dap configuration
       -- See https://github.com/microsoft/debugpy/wiki/Debug-configuration-settings for values
       dap = { justMyCode = false },
+      -- `dap` can also be a function:
+      -- function(root, position, default_config, context) -> table
+      -- `context` includes the resolved host/container paths, command, cwd and env.
       -- Command line arguments for runner
       -- Can also be a function to return dynamic values
       args = { "--log-level", "DEBUG" },
@@ -104,6 +107,35 @@ require("neotest").setup({
   },
 })
 ```
+
+### Docker Debugging
+
+For container debugging, return an attach config from `dap` and start the
+debuggee in the callback using the provided `context`:
+
+```lua
+require("neotest-python")({
+  python = { "docker", "compose", "exec", "-T", "web", "python" },
+  path_mappings = {
+    [vim.fn.getcwd()] = "/app",
+    ["/tmp"] = "/tmp",
+  },
+  dap = function(_, _, default_config, context)
+    return vim.tbl_deep_extend("force", default_config, {
+      request = "attach",
+      connect = { host = "127.0.0.1", port = 5678 },
+      before = function()
+        -- Start debugpy in the container here.
+        -- `context.container_script_path` and `context.script_args`
+        -- already contain the translated paths for this test run.
+      end,
+    })
+  end,
+})
+```
+
+If your remote debug flow should not stop on pytest internal exceptions, set
+`NEOTEST_PYTHON_DISABLE_POSTMORTEM=1` in the debuggee environment.
 
 By making `path_mappings` a function, you can dynamically resolve mounts:
 
