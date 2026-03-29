@@ -35,7 +35,7 @@ local augment_config = function(config)
         return python
       end
 
-      return base.get_python(root)
+      return base.get_python_command(root)
     end
   end
 

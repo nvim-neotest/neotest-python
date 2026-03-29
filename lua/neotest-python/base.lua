@@ -210,7 +210,10 @@ function M.create_dap_config(python_path, script_path, script_args, cwd, env, da
 
   local dap_config = default_config
   if type(dap_args) == "function" then
-    dap_config = dap_args(context.root, context.position, vim.deepcopy(default_config), context) or default_config
+    local override = dap_args(context.root, context.position, vim.deepcopy(default_config), context)
+    if override then
+      dap_config = vim.tbl_deep_extend("force", default_config, override)
+    end
   elseif dap_args then
     dap_config = vim.tbl_deep_extend("force", default_config, dap_args)
   end

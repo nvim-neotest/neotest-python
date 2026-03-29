@@ -23,6 +23,7 @@ require("neotest").setup({
       dap = { justMyCode = false },
       -- `dap` can also be a function:
       -- function(root, position, default_config, context) -> table
+      -- Return partial overrides; they are merged with `default_config`.
       -- `context` includes the resolved host/container paths, command, cwd and env.
       -- Command line arguments for runner
       -- Can also be a function to return dynamic values
@@ -120,8 +121,8 @@ require("neotest-python")({
     [vim.fn.getcwd()] = "/app",
     ["/tmp"] = "/tmp",
   },
-  dap = function(_, _, default_config, context)
-    return vim.tbl_deep_extend("force", default_config, {
+  dap = function(_, _, _, context)
+    return {
       request = "attach",
       connect = { host = "127.0.0.1", port = 5678 },
       before = function()
@@ -129,7 +130,7 @@ require("neotest-python")({
         -- `context.container_script_path` and `context.script_args`
         -- already contain the translated paths for this test run.
       end,
-    })
+    }
   end,
 })
 ```

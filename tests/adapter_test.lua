@@ -106,6 +106,32 @@ local attach_adapter = neotest_python({
   end,
 })
 
+local partial_attach_adapter = neotest_python({
+  runner = "pytest",
+  python = function()
+    return nil
+  end,
+  args = function()
+    return { "-q" }
+  end,
+  path_mappings = {
+    [root] = "/workspace",
+    ["/tmp"] = "/tmp",
+  },
+  dap = function()
+    return {
+      request = "attach",
+      connect = {
+        host = "127.0.0.1",
+        port = 9000,
+      },
+    }
+  end,
+  root = function()
+    return root
+  end,
+})
+
 local function find_arg(command, key)
   for index, item in ipairs(command) do
     if item == key then
@@ -174,6 +200,37 @@ nio.run(function()
   local project_mapping = find_path_mapping(attach_dap_spec.strategy.pathMappings, root)
   assert_equal(project_mapping.localRoot, root, "attach config should derive debugpy path mappings from adapter mappings")
   assert_equal(project_mapping.remoteRoot, "/workspace", "attach config should derive remote path mappings")
+
+  local partial_attach_dap_spec = partial_attach_adapter.build_spec({
+    tree = make_tree(vim.deepcopy(position)),
+    strategy = "dap",
+  })
+
+  assert_equal(
+    partial_attach_dap_spec.command[1] ~= nil,
+    true,
+    "python fallback should use the adapter default command when config.python returns nil"
+  )
+  assert_equal(
+    partial_attach_dap_spec.strategy.type,
+    "python",
+    "partial dap overrides should keep the default debugger type"
+  )
+  assert_equal(
+    partial_attach_dap_spec.strategy.name,
+    "Neotest Debugger",
+    "partial dap overrides should keep the default debugger name"
+  )
+  assert_equal(
+    partial_attach_dap_spec.strategy.connect.port,
+    9000,
+    "partial dap overrides should merge custom connect settings"
+  )
+  assert_equal(
+    partial_attach_dap_spec.strategy.program,
+    nil,
+    "attach overrides should still drop launch-only program fields after merging"
+  )
 
   vim.g.neotest_python_adapter_tests_passed = true
   print("adapter tests passed")
