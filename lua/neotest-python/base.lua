@@ -80,8 +80,12 @@ function M.get_python_command(root)
       { stdout = true }
     )
     if success and exit_code == 0 then
-      python_command_mem[root] = { Path:new(data).filename }
-      return python_command_mem[root]
+      local python_path = type(data) == "table" and data.stdout or tostring(data)
+      python_path = python_path:gsub("\r?\n", "")
+      if python_path and python_path ~= "" then
+        python_command_mem[root] = { python_path }
+        return python_command_mem[root]
+      end
     end
   end
 
@@ -101,7 +105,10 @@ function M.get_script_path()
     end
   end
 
-  error("neotest.py not found")
+  vim.schedule(function()
+    vim.notify("neotest.py not found", vim.log.levels.ERROR)
+  end)
+  return ""
 end
 
 ---@param python_command string[]
@@ -174,6 +181,102 @@ function M.create_dap_config(python_path, script_path, script_args, dap_args)
     cwd = nio.fn.getcwd(),
     args = script_args,
   }, dap_args or {})
+end
+
+function M.get_docker_python_command(root, docker_config)
+  root = root or vim.loop.cwd()
+
+  local container = docker_config.container
+  local image = docker_config.image
+  local command = docker_config.command or { "docker", "exec" }
+  local args = docker_config.args or {}
+  local workdir = docker_config.workdir or "/app"
+
+  if not container and not image then
+    vim.schedule(function()
+      vim.notify("Docker config must specify either 'container' or 'image'", vim.log.levels.ERROR)
+    end)
+    return M.get_python_command(root)
+  end
+
+  local docker_cmd = vim.list_extend({}, command)
+
+  if container then
+    vim.list_extend(docker_cmd, args)
+    table.insert(docker_cmd, container)
+  elseif image then
+    docker_cmd = { "docker", "run", "--rm" }
+    vim.list_extend(docker_cmd, args)
+    vim.list_extend(docker_cmd, { "-v", root .. ":" .. workdir, "-w", workdir, image })
+  end
+
+  table.insert(docker_cmd, "python")
+  return docker_cmd
+end
+
+function M.translate_path_to_container(host_path, docker_config)
+  if not docker_config then
+    return host_path
+  end
+
+  local workdir = docker_config.workdir or "/app"
+  local cwd = vim.loop.cwd()
+
+  if vim.startswith(host_path, cwd) then
+    local relative_path = host_path:sub(#cwd + 2)
+    return workdir .. "/" .. relative_path
+  end
+
+  return host_path
+end
+
+function M.translate_path_to_host(container_path, docker_config)
+  if not docker_config then
+    return container_path
+  end
+
+  local workdir = docker_config.workdir or "/app"
+  local cwd = vim.loop.cwd()
+
+  if vim.startswith(container_path, workdir) then
+    local relative_path = container_path:sub(#workdir + 2)
+    return cwd .. "/" .. relative_path
+  end
+
+  return container_path
+end
+
+function M.copy_script_to_container(docker_config)
+  if not docker_config or not docker_config.container then
+    return M.get_script_path()
+  end
+
+  local script_path = M.get_script_path()
+  local script_dir = vim.fn.fnamemodify(script_path, ":h")
+  local container_script_path = "/tmp/neotest.py"
+  local container_dir_path = "/tmp/neotest_python"
+
+  local copy_cmd = {
+    "docker", "cp", script_path,
+    docker_config.container .. ":" .. container_script_path
+  }
+
+  local success = lib.process.run(copy_cmd) == 0
+  if not success then
+    vim.schedule(function()
+      vim.notify("Failed to copy neotest script to container", vim.log.levels.ERROR)
+    end)
+    return script_path
+  end
+
+  local copy_dir_cmd = {
+    "docker", "cp", script_dir .. "/neotest_python",
+    docker_config.container .. ":" .. container_dir_path
+  }
+
+  lib.process.run(copy_dir_cmd)
+
+  return container_script_path
 end
 
 local stored_runners = {}
