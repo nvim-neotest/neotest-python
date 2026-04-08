@@ -3,7 +3,7 @@ import os
 import re
 from io import StringIO
 from pathlib import Path
-from typing import Callable, Dict, Generator, List, Optional, Union
+from typing import Callable, Dict, Generator, List, Optional, Tuple, Union
 
 import pytest
 from _pytest._code.code import ExceptionRepr
@@ -23,18 +23,18 @@ class PytestNeotestAdapter(NeotestAdapter):
         self,
         args: List[str],
         stream: Callable[[str, NeotestResult], None],
-    ) -> Dict[str, NeotestResult]:
+    ) -> Tuple[Dict[str, NeotestResult], int]:
         result_collector = NeotestResultCollector(
             self, stream=stream, emit_parameterized_ids=self.emit_parameterized_ids
         )
-        pytest.main(
+        exit_code = pytest.main(
             args=args,
             plugins=[
                 result_collector,
                 NeotestDebugpyPlugin(),
             ],
         )
-        return result_collector.results
+        return result_collector.results, int(exit_code)
 
 
 class NeotestResultCollector:
@@ -76,10 +76,19 @@ class NeotestResultCollector:
     def pytest_configure(self, config: "pytest.Config"):
         self.pytest_config = config
 
+    def _get_abs_path(self, file_path: Union[str, Path]):
+        try:
+            # rootpath is now the preferred way to access root
+            abs_path = str(self.pytest_config.rootpath / file_path)
+        except AttributeError:
+            # fallback to rootdir for older pytest versions
+            abs_path = str(Path(self.pytest_config.rootdir, file_path))
+        return abs_path
+
     def pytest_deselected(self, items: List["pytest.Item"]):
         for report in items:
             file_path, *name_path = report.nodeid.split("::")
-            abs_path = str(Path(self.pytest_config.rootdir, file_path))
+            abs_path = self._get_abs_path(file_path)
             *namespaces, test_name = name_path
             valid_test_name, *params = test_name.split("[")  # ]
             pos_id = "::".join([abs_path, *(namespaces), valid_test_name])
@@ -129,7 +138,7 @@ class NeotestResultCollector:
             return
 
         file_path, *name_path = report.nodeid.split("::")
-        abs_path = str(Path(self.pytest_config.rootdir, file_path))
+        abs_path = self._get_abs_path(file_path)
         *namespaces, test_name = name_path
         valid_test_name, *params = test_name.split("[")  # ]
 
@@ -239,9 +248,11 @@ class TestNameTemplateExtractor:
         print(f"\n{json.dumps(config)}\n")
 
 
-def extract_test_name_template(args):
-    pytest.main(args=["-k", "neotest_none"], plugins=[TestNameTemplateExtractor])
+def extract_test_name_template(args) -> int:
+    return int(
+        pytest.main(args=["-k", "neotest_none"], plugins=[TestNameTemplateExtractor])
+    )
 
 
-def collect(args):
-    pytest.main(["--collect-only", "--verbosity=0", "-q"] + args)
+def collect(args) -> int:
+    return int(pytest.main(["--collect-only", "--verbosity=0", "-q"] + args))

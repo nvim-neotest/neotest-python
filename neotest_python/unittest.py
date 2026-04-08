@@ -45,7 +45,7 @@ class UnittestNeotestAdapter(NeotestAdapter):
         return [*args, ".".join([relative_dotted, *child_ids])]
 
     # TODO: Stream results
-    def run(self, args: List[str], _) -> Dict:
+    def run(self, args: List[str], _) -> Tuple[Dict, int]:
         results = {}
 
         errs: Dict[str, Tuple[Exception, Any, TracebackType]] = {}
@@ -96,11 +96,11 @@ class UnittestNeotestAdapter(NeotestAdapter):
 
         # Prepend an executable name which is just used in output
         argv = ["neotest-python"] + self.convert_args(args[-1], args[:-1])
-        unittest.main(
+        program = unittest.main(
             module=None,
             argv=argv,
             testRunner=NeotestUnittestRunner(resultclass=NeotestTextTestResult),
             exit=False,
         )
-
-        return results
+        exit_code = 0 if program.result.wasSuccessful() else 1
+        return results, exit_code

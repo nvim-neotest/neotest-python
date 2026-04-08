@@ -1,6 +1,6 @@
 import abc
 from enum import Enum
-from typing import TYPE_CHECKING, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Tuple
 
 
 class NeotestResultStatus(str, Enum):
@@ -43,6 +43,6 @@ class NeotestAdapter(abc.ABC):
         }
 
     @abc.abstractmethod
-    def run(self, args: List[str], stream: Callable):
+    def run(self, args: List[str], stream: Callable) -> Tuple[Dict, int]:
         del args, stream
         raise NotImplementedError
