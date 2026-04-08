@@ -3,6 +3,33 @@ local lib = require("neotest.lib")
 local Path = require("plenary.path")
 
 local M = {}
+local script_path_mem
+
+---@param mappings { forward: table<string, string>, forward_keys?: string[] }|table<string, string>|nil
+---@return { localRoot: string, remoteRoot: string }[]
+function M.get_dap_path_mappings(mappings)
+  local forward = mappings and mappings.forward or mappings or {}
+  local keys = mappings and mappings.forward_keys or {}
+  local path_mappings = {}
+
+  if vim.tbl_isempty(keys) then
+    for local_root in pairs(forward) do
+      table.insert(keys, local_root)
+    end
+    table.sort(keys, function(a, b)
+      return #a > #b
+    end)
+  end
+
+  for _, local_root in ipairs(keys) do
+    path_mappings[#path_mappings + 1] = {
+      localRoot = local_root,
+      remoteRoot = forward[local_root],
+    }
+  end
+
+  return path_mappings
+end
 
 function M.is_test_file(file_path)
   if not vim.endswith(file_path, ".py") then
@@ -94,10 +121,15 @@ end
 
 ---@return string
 function M.get_script_path()
+  if script_path_mem then
+    return script_path_mem
+  end
+
   local paths = vim.api.nvim_get_runtime_file("neotest.py", true)
   for _, path in ipairs(paths) do
     if vim.endswith(path, ("neotest-python%sneotest.py"):format(lib.files.sep)) then
-      return path
+      script_path_mem = path
+      return script_path_mem
     end
   end
 
@@ -164,16 +196,38 @@ end
 M.get_root =
   lib.files.match_root_pattern("pyproject.toml", "setup.cfg", "mypy.ini", "pytest.ini", "setup.py")
 
-function M.create_dap_config(python_path, script_path, script_args, dap_args)
-  return vim.tbl_extend("keep", {
+function M.create_dap_config(python_path, script_path, script_args, cwd, env, dap_args, context)
+  local default_config = {
     type = "python",
     name = "Neotest Debugger",
     request = "launch",
     python = python_path,
     program = script_path,
-    cwd = nio.fn.getcwd(),
+    cwd = cwd or nio.fn.getcwd(),
+    env = env,
     args = script_args,
-  }, dap_args or {})
+  }
+
+  local dap_config = default_config
+  if type(dap_args) == "function" then
+    local override = dap_args(context.root, context.position, vim.deepcopy(default_config), context)
+    if override then
+      dap_config = vim.tbl_deep_extend("force", default_config, override)
+    end
+  elseif dap_args then
+    dap_config = vim.tbl_deep_extend("force", default_config, dap_args)
+  end
+
+  if dap_config.request == "attach" then
+    dap_config.python = nil
+    dap_config.program = nil
+    dap_config.args = nil
+    if not dap_config.pathMappings and context.mappings then
+      dap_config.pathMappings = M.get_dap_path_mappings(context.mappings)
+    end
+  end
+
+  return dap_config
 end
 
 local stored_runners = {}

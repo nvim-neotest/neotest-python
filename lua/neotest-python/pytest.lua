@@ -1,5 +1,6 @@
 local lib = require("neotest.lib")
 local logger = require("neotest.logging")
+local path_mapping = require("neotest-python.path_mapping")
 
 local M = {}
 
@@ -52,7 +53,8 @@ end
 ---@param path string
 ---@param positions neotest.Tree
 ---@param root string
-local function discover_params(python, script, path, positions, root)
+---@param mappings table<string, string>
+local function discover_params(python, script, path, positions, root, mappings)
   local cmd = vim.iter({ python, script, "--pytest-collect", path }):flatten():totable()
   logger.debug("Running test instance discovery:", cmd)
 
@@ -70,6 +72,7 @@ local function discover_params(python, script, path, positions, root)
     local param_index = string.find(line, "[", nil, true)
     if param_index then
       local test_id = root .. lib.files.path.sep .. string.sub(line, 1, param_index - 1)
+      test_id = path_mapping.to_host_path(test_id, mappings)
       local param_id = string.sub(line, param_index + 1, #line - 1)
 
       if positions:get_key(test_id) then
@@ -91,9 +94,11 @@ end
 ---@param path string
 ---@param positions neotest.Tree
 ---@param root string
-function M.augment_positions(python, script, path, positions, root)
-  if has_parametrize(path) then
-    local test_params = discover_params(python, script, path, positions, root)
+---@param mappings table<string, string>
+function M.augment_positions(python, script, path, positions, root, mappings)
+  local host_path = path_mapping.to_host_path(path, mappings)
+  if has_parametrize(host_path) then
+    local test_params = discover_params(python, script, path, positions, root, mappings)
     add_test_instances(positions, test_params)
   end
 end
