@@ -111,7 +111,7 @@ end
 local function scan_test_function_pattern(runner, config, python_command)
   local test_function_pattern = "^test"
   if runner == "pytest" and config.pytest_discovery then
-    local cmd = vim.tbl_flatten({ python_command, M.get_script_path(), "--pytest-extract-test-name-template" })
+    local cmd = vim.iter({ python_command, M.get_script_path(), "--pytest-extract-test-name-template" }):flatten():totable()
     local _, data = lib.process.run(cmd, { stdout = true, stderr = true })
 
     for line in vim.gsplit(data.stdout, "\n", true) do
