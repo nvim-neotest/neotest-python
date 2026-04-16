@@ -240,7 +240,9 @@ class NeotestDebugpyPlugin:
 class TestNameTemplateExtractor:
     @staticmethod
     def pytest_collection_modifyitems(config):
-        extracted_config = {"python_functions": config.getini("python_functions")[0]}
+        extracted_config = {
+            "python_functions": " ".join(config.getini("python_functions"))
+        }
 
         # Extract describe_prefixes if pytest-describe is configured
         describe_prefixes = config.getini("describe_prefixes")
