@@ -111,21 +111,13 @@ end
 local function scan_test_function_pattern(runner, config, python_command)
   local test_function_pattern = "^test"
   if runner == "pytest" and config.pytest_discovery then
-    local cmd = vim.tbl_flatten({
-      python_command,
-      M.get_script_path(),
-      "--pytest-extract-test-name-template",
-    })
+    local cmd = vim.tbl_flatten({ python_command, M.get_script_path(), "--pytest-extract-test-name-template" })
     local _, data = lib.process.run(cmd, { stdout = true, stderr = true })
 
     for line in vim.gsplit(data.stdout, "\n", true) do
       if string.sub(line, 1, 1) == "{" and string.find(line, "python_functions") ~= nil then
         local pytest_option = vim.json.decode(line)
-        local patterns = vim.split(pytest_option.python_functions, " ", { trimempty = true })
-        local regex_parts = vim.tbl_map(function(p)
-          return "^" .. p:gsub("%*", "")
-        end, patterns)
-        test_function_pattern = table.concat(regex_parts, "|")
+        test_function_pattern = pytest_option.python_functions
       end
     end
   end
@@ -138,8 +130,7 @@ end
 ---@return string
 M.treesitter_queries = function(runner, config, python_command)
   local test_function_pattern = scan_test_function_pattern(runner, config, python_command)
-  return string.format(
-    [[
+  return string.format([[
     ;; Match undecorated functions
     ((function_definition
       name: (identifier) @test.name)
@@ -167,10 +158,7 @@ M.treesitter_queries = function(runner, config, python_command)
       @namespace.definition
      (#not-has-parent? @namespace.definition decorated_definition)
     )
-  ]],
-    test_function_pattern,
-    test_function_pattern
-  )
+  ]], test_function_pattern, test_function_pattern)
 end
 
 M.get_root =

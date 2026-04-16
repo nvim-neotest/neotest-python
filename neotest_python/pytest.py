@@ -240,7 +240,7 @@ class NeotestDebugpyPlugin:
 class TestNameTemplateExtractor:
     @staticmethod
     def pytest_collection_modifyitems(config):
-        config = {"python_functions": config.getini("python_functions")[0]}
+        config = {"python_functions": " ".join(config.getini("python_functions"))}
         print(f"\n{json.dumps(config)}\n")
 
 
