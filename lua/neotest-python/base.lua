@@ -111,7 +111,7 @@ end
 local function scan_pytest_config(runner, config, python_command)
   local test_function_pattern = "^test"
   local namespace_pattern = "" -- For describe_prefixes
-  
+
   if runner == "pytest" and config.pytest_discovery then
     local cmd = vim.tbl_flatten({
       python_command,
@@ -123,19 +123,35 @@ local function scan_pytest_config(runner, config, python_command)
     for line in vim.gsplit(data.stdout, "\n", true) do
       if string.sub(line, 1, 1) == "{" then
         local pytest_option = vim.json.decode(line)
-        
-         -- Extract python_functions pattern
-         if pytest_option.python_functions then
-           local patterns = vim.split(pytest_option.python_functions, " ", { trimempty = true })
-           local regex_parts = vim.tbl_map(function(p)
-             return "^" .. p:gsub("%*", "")
-           end, patterns)
-           test_function_pattern = table.concat(regex_parts, "|")
-         end
-        
+
+        -- Extract python_functions pattern
+        if pytest_option.python_functions then
+          local patterns = pytest_option.python_functions
+          -- Handle both string and table types for robustness
+          if type(patterns) == "table" then
+            -- Already a table (from legacy JSON array format), use directly
+            patterns = patterns
+          else
+            -- String format, split by spaces
+            patterns = vim.split(patterns, " ", { trimempty = true })
+          end
+          local regex_parts = vim.tbl_map(function(p)
+            return "^" .. p:gsub("%*", "")
+          end, patterns)
+          test_function_pattern = table.concat(regex_parts, "|")
+        end
+
         -- Extract describe_prefixes pattern (from pytest-describe plugin)
         if pytest_option.describe_prefixes then
-          local prefixes = vim.split(pytest_option.describe_prefixes, " ", { trimempty = true })
+          local prefixes = pytest_option.describe_prefixes
+          -- Handle both string and table types for robustness
+          if type(prefixes) == "table" then
+            -- Already a table (from legacy JSON array format), use directly
+            prefixes = prefixes
+          else
+            -- String format, split by spaces
+            prefixes = vim.split(prefixes, " ", { trimempty = true })
+          end
           local prefix_patterns = vim.tbl_map(function(p)
             return "^" .. p .. "_"
           end, prefixes)
@@ -144,12 +160,12 @@ local function scan_pytest_config(runner, config, python_command)
       end
     end
   end
-  
+
   -- Default namespace patterns if none configured
   if namespace_pattern == "" then
-    namespace_pattern = "^(describe_|context_|when_|given_|scenario_|requirement_)"
+    namespace_pattern = "^describe_|^context_|^when_|^given_|^scenario_|^requirement_"
   end
-  
+
   return {
     test_pattern = test_function_pattern,
     namespace_pattern = namespace_pattern,
@@ -164,7 +180,7 @@ M.treesitter_queries = function(runner, config, python_command)
   local patterns = scan_pytest_config(runner, config, python_command)
   local test_function_pattern = patterns.test_pattern
   local namespace_pattern = patterns.namespace_pattern
-  
+
   return string.format(
     [[
     ;; Match container functions (describe_*, context_*, when_*, given_*, scenario_*, requirement_*)
