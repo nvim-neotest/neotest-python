@@ -250,8 +250,8 @@ M.treesitter_queries = function(runner, config, python_command)
       body: (block
         (function_definition
           name: (identifier) @test.name)
-          (#match? @test.name "%s"))))
-      @test.definition
+          (#match? @test.name "%s")))
+      @test.definition)
 
     ;; Match decorated test methods inside classes
     ((class_definition
@@ -259,8 +259,8 @@ M.treesitter_queries = function(runner, config, python_command)
         (decorated_definition
           (function_definition
             name: (identifier) @test.name)
-            (#match? @test.name "%s")))))
-      @test.definition
+            (#match? @test.name "%s"))))
+      @test.definition)
   ]],
     namespace_pattern,
     test_function_pattern,
