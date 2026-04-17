@@ -215,7 +215,13 @@ M.treesitter_queries = function(runner, config, python_command)
       (#match? @namespace.name "%s"))
       @namespace.definition
 
-    ;; Match undecorated test functions
+    ;; Match classes matching python_classes pattern - these are also namespaces
+    ((class_definition
+      name: (identifier) @namespace.name)
+      (#match? @namespace.name "%s"))
+      @namespace.definition
+
+    ;; Match undecorated test functions (top-level and inside classes)
     ((function_definition
       name: (identifier) @test.name)
       (#match? @test.name "%s"))
@@ -227,45 +233,8 @@ M.treesitter_queries = function(runner, config, python_command)
         name: (identifier) @test.name)
         (#match? @test.name "%s")))
         @test.definition
-
-    ;; Match decorated classes matching python_classes pattern
-    (decorated_definition
-      (class_definition
-       name: (identifier) @namespace.name)
-       (#match? @namespace.name "%s"))
-       @namespace.definition
-
-    ;; Match undecorated classes matching python_classes pattern
-    ;; namespaces nest so #not-has-parent is used to ensure each namespace is annotated only once
-    (
-     (class_definition
-      name: (identifier) @namespace.name)
-      @namespace.definition
-      (#match? @namespace.name "%s")
-      (#not-has-parent? @namespace.definition decorated_definition)
-    )
-
-    ;; Match test methods inside classes
-    ((class_definition
-      body: (block
-        (function_definition
-          name: (identifier) @test.name)
-          (#match? @test.name "%s")))
-      @test.definition)
-
-    ;; Match decorated test methods inside classes
-    ((class_definition
-      body: (block
-        (decorated_definition
-          (function_definition
-            name: (identifier) @test.name)
-            (#match? @test.name "%s"))))
-      @test.definition)
   ]],
     namespace_pattern,
-    test_function_pattern,
-    test_function_pattern,
-    class_pattern,
     class_pattern,
     test_function_pattern,
     test_function_pattern
