@@ -107,10 +107,11 @@ end
 ---@param python_command string[]
 ---@param config neotest-python._AdapterConfig
 ---@param runner string
----@return table {test_pattern: string, namespace_pattern: string}
+---@return table {test_pattern: string, namespace_pattern: string, class_pattern: string}
 local function scan_pytest_config(runner, config, python_command)
   local test_function_pattern = "^test"
   local namespace_pattern = "" -- For describe_prefixes
+  local class_pattern = "" -- For python_classes
 
   if runner == "pytest" and config.pytest_discovery then
     local cmd = vim.tbl_flatten({
@@ -157,6 +158,23 @@ local function scan_pytest_config(runner, config, python_command)
           end, prefixes)
           namespace_pattern = table.concat(prefix_patterns, "|")
         end
+
+        -- Extract python_classes pattern (for class-based tests like BDD)
+        if pytest_option.python_classes then
+          local classes = pytest_option.python_classes
+          -- Handle both string and table types for robustness
+          if type(classes) == "table" then
+            -- Already a table (from legacy JSON array format), use directly
+            classes = classes
+          else
+            -- String format, split by spaces
+            classes = vim.split(classes, " ", { trimempty = true })
+          end
+          local class_patterns = vim.tbl_map(function(p)
+            return "^" .. p:gsub("%*", "")
+          end, classes)
+          class_pattern = table.concat(class_patterns, "|")
+        end
       end
     end
   end
@@ -166,9 +184,15 @@ local function scan_pytest_config(runner, config, python_command)
     namespace_pattern = "^describe_|^context_|^when_|^given_|^scenario_|^requirement_"
   end
 
+  -- Default class patterns if none configured
+  if class_pattern == "" then
+    class_pattern = "^Test"
+  end
+
   return {
     test_pattern = test_function_pattern,
     namespace_pattern = namespace_pattern,
+    class_pattern = class_pattern,
   }
 end
 
@@ -180,6 +204,7 @@ M.treesitter_queries = function(runner, config, python_command)
   local patterns = scan_pytest_config(runner, config, python_command)
   local test_function_pattern = patterns.test_pattern
   local namespace_pattern = patterns.namespace_pattern
+  local class_pattern = patterns.class_pattern
 
   return string.format(
     [[
@@ -203,22 +228,45 @@ M.treesitter_queries = function(runner, config, python_command)
         (#match? @test.name "%s")))
         @test.definition
 
-    ;; Match decorated classes, including decorators in definition
+    ;; Match decorated classes matching python_classes pattern
     (decorated_definition
       (class_definition
-       name: (identifier) @namespace.name))
+       name: (identifier) @namespace.name)
+       (#match? @namespace.name "%s"))
        @namespace.definition
 
-    ;; Match undecorated classes: namespaces nest so #not-has-parent is used
-    ;; to ensure each namespace is annotated only once
+    ;; Match undecorated classes matching python_classes pattern
+    ;; namespaces nest so #not-has-parent is used to ensure each namespace is annotated only once
     (
      (class_definition
       name: (identifier) @namespace.name)
       @namespace.definition
-     (#not-has-parent? @namespace.definition decorated_definition)
+      (#match? @namespace.name "%s")
+      (#not-has-parent? @namespace.definition decorated_definition)
     )
+
+    ;; Match test methods inside classes
+    ((class_definition
+      body: (block
+        (function_definition
+          name: (identifier) @test.name)
+          (#match? @test.name "%s"))))
+      @test.definition
+
+    ;; Match decorated test methods inside classes
+    ((class_definition
+      body: (block
+        (decorated_definition
+          (function_definition
+            name: (identifier) @test.name)
+            (#match? @test.name "%s")))))
+      @test.definition
   ]],
     namespace_pattern,
+    test_function_pattern,
+    test_function_pattern,
+    class_pattern,
+    class_pattern,
     test_function_pattern,
     test_function_pattern
   )

@@ -249,6 +249,11 @@ class TestNameTemplateExtractor:
         if describe_prefixes:
             extracted_config["describe_prefixes"] = " ".join(describe_prefixes)
 
+        # Extract python_classes if configured
+        python_classes = config.getini("python_classes")
+        if python_classes:
+            extracted_config["python_classes"] = " ".join(python_classes)
+
         print(f"\n{json.dumps(extracted_config)}\n")
 
 
