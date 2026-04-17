@@ -215,13 +215,7 @@ M.treesitter_queries = function(runner, config, python_command)
       (#match? @namespace.name "%s"))
       @namespace.definition
 
-    ;; Match classes matching python_classes pattern - these are also namespaces
-    ((class_definition
-      name: (identifier) @namespace.name)
-      (#match? @namespace.name "%s"))
-      @namespace.definition
-
-    ;; Match undecorated test functions (top-level and inside classes)
+    ;; Match test functions (both top-level and inside classes)
     ((function_definition
       name: (identifier) @test.name)
       (#match? @test.name "%s"))
@@ -233,11 +227,25 @@ M.treesitter_queries = function(runner, config, python_command)
         name: (identifier) @test.name)
         (#match? @test.name "%s")))
         @test.definition
+
+    ;; Match classes as namespaces (with pytest python_classes filter)
+    ((class_definition
+      name: (identifier) @namespace.name)
+      (#match? @namespace.name "%s"))
+      @namespace.definition
+
+    ;; Match decorated classes
+    (decorated_definition
+      ((class_definition
+        name: (identifier) @namespace.name)
+        (#match? @namespace.name "%s")))
+        @namespace.definition
   ]],
     namespace_pattern,
-    class_pattern,
     test_function_pattern,
-    test_function_pattern
+    test_function_pattern,
+    class_pattern,
+    class_pattern
   )
 end
 
