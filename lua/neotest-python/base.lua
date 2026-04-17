@@ -113,7 +113,9 @@ local function scan_pytest_config(runner, config, python_command)
   local namespace_pattern = "" -- For describe_prefixes
   local class_pattern = "" -- For python_classes
 
-  if runner == "pytest" and config.pytest_discovery then
+  -- Extract pytest config patterns regardless of pytest_discovery setting
+  -- pytest_discovery controls parameterized test discovery, not pattern extraction
+  if runner == "pytest" then
     local cmd = vim.tbl_flatten({
       python_command,
       M.get_script_path(),
