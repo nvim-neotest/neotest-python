@@ -107,9 +107,10 @@ end
 ---@param python_command string[]
 ---@param config neotest-python._AdapterConfig
 ---@param runner string
+---@param root string Project root directory (used as cwd for pytest config extraction)
 ---@return table {test_pattern: string, namespace_pattern: string, class_pattern: string}
-local function scan_pytest_config(runner, config, python_command)
-  local test_function_pattern = "^test"
+local function scan_pytest_config(runner, config, python_command, root)
+  local test_function_pattern = "^test_|^it_"
   local namespace_pattern = "" -- For describe_prefixes
   local class_pattern = "" -- For python_classes
 
@@ -120,6 +121,7 @@ local function scan_pytest_config(runner, config, python_command)
       python_command,
       M.get_script_path(),
       "--pytest-extract-test-name-template",
+      root or "",
     })
     local _, data = lib.process.run(cmd, { stdout = true, stderr = true })
 
@@ -201,9 +203,10 @@ end
 ---@param python_command string[]
 ---@param config neotest-python._AdapterConfig
 ---@param runner string
+---@param root? string Project root directory for reading pytest config
 ---@return string
-M.treesitter_queries = function(runner, config, python_command)
-  local patterns = scan_pytest_config(runner, config, python_command)
+M.treesitter_queries = function(runner, config, python_command, root)
+  local patterns = scan_pytest_config(runner, config, python_command, root)
   local test_function_pattern = patterns.test_pattern
   local namespace_pattern = patterns.namespace_pattern
   local class_pattern = patterns.class_pattern
@@ -216,6 +219,13 @@ M.treesitter_queries = function(runner, config, python_command)
       name: (identifier) @namespace.name)
       (#match? @namespace.name "%s"))
       @namespace.definition
+
+    ;; Match decorated container functions
+    (decorated_definition
+      ((function_definition
+        name: (identifier) @namespace.name)
+        (#match? @namespace.name "%s")))
+        @namespace.definition
 
     ;; Match test functions (both top-level and inside classes)
     ((function_definition
@@ -243,6 +253,7 @@ M.treesitter_queries = function(runner, config, python_command)
         (#match? @namespace.name "%s")))
         @namespace.definition
   ]],
+    namespace_pattern,
     namespace_pattern,
     test_function_pattern,
     test_function_pattern,

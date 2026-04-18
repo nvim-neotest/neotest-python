@@ -245,9 +245,12 @@ class TestNameTemplateExtractor:
         }
 
         # Extract describe_prefixes if pytest-describe is configured
-        describe_prefixes = config.getini("describe_prefixes")
-        if describe_prefixes:
-            extracted_config["describe_prefixes"] = " ".join(describe_prefixes)
+        try:
+            describe_prefixes = config.getini("describe_prefixes")
+            if describe_prefixes:
+                extracted_config["describe_prefixes"] = " ".join(describe_prefixes)
+        except ValueError:
+            pass  # pytest-describe not installed; use Lua defaults
 
         # Extract python_classes if configured
         python_classes = config.getini("python_classes")
@@ -257,10 +260,90 @@ class TestNameTemplateExtractor:
         print(f"\n{json.dumps(extracted_config)}\n")
 
 
+def _read_pytest_config_from_files(root: str) -> dict:
+    """Read pytest ini options directly from config files without running pytest.
+
+    Supports pyproject.toml, pytest.ini, setup.cfg, and tox.ini.
+    This avoids triggering pytest collection on large projects.
+    """
+    from pathlib import Path
+    import sys
+    import configparser
+
+    root_path = Path(root)
+    result = {}
+
+    # --- pyproject.toml ---
+    pyproject = root_path / "pyproject.toml"
+    if pyproject.exists():
+        try:
+            if sys.version_info >= (3, 11):
+                import tomllib
+
+                with open(pyproject, "rb") as f:
+                    data = tomllib.load(f)
+            else:
+                import tomli  # type: ignore[import]
+
+                with open(pyproject, "rb") as f:
+                    data = tomli.load(f)
+            opts = data.get("tool", {}).get("pytest", {}).get("ini_options", {})
+            for key in ("python_functions", "python_classes", "describe_prefixes"):
+                if key in opts:
+                    val = opts[key]
+                    result[key] = " ".join(val) if isinstance(val, list) else str(val)
+        except Exception:
+            pass
+
+    if result:
+        return result
+
+    # --- pytest.ini ---
+    pytest_ini = root_path / "pytest.ini"
+    if pytest_ini.exists():
+        cfg = configparser.ConfigParser()
+        cfg.read(pytest_ini)
+        if cfg.has_section("pytest"):
+            for key in ("python_functions", "python_classes", "describe_prefixes"):
+                if cfg.has_option("pytest", key):
+                    result[key] = cfg.get("pytest", key).strip()
+
+    if result:
+        return result
+
+    # --- setup.cfg ---
+    setup_cfg = root_path / "setup.cfg"
+    if setup_cfg.exists():
+        cfg = configparser.ConfigParser()
+        cfg.read(setup_cfg)
+        if cfg.has_section("tool:pytest"):
+            for key in ("python_functions", "python_classes", "describe_prefixes"):
+                if cfg.has_option("tool:pytest", key):
+                    result[key] = cfg.get("tool:pytest", key).strip()
+
+    if result:
+        return result
+
+    # --- tox.ini ---
+    tox_ini = root_path / "tox.ini"
+    if tox_ini.exists():
+        cfg = configparser.ConfigParser()
+        cfg.read(tox_ini)
+        if cfg.has_section("pytest"):
+            for key in ("python_functions", "python_classes", "describe_prefixes"):
+                if cfg.has_option("pytest", key):
+                    result[key] = cfg.get("pytest", key).strip()
+
+    return result
+
+
 def extract_test_name_template(args) -> int:
-    return int(
-        pytest.main(args=["-k", "neotest_none"], plugins=[TestNameTemplateExtractor])
-    )
+    # args[0] is the project root directory passed from Lua.
+    # Parse config files directly to avoid triggering pytest collection on large projects.
+    root = args[0] if args else "."
+    config = _read_pytest_config_from_files(root)
+    print(f"\n{json.dumps(config)}\n")
+    return 0
 
 
 def collect(args) -> int:

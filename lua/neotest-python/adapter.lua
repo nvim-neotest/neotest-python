@@ -65,7 +65,7 @@ return function(config)
       local python_command = config.get_python_command(root)
       local runner = config.get_runner(python_command)
 
-      local positions = lib.treesitter.parse_positions(path, base.treesitter_queries(runner, config, python_command), {
+      local positions = lib.treesitter.parse_positions(path, base.treesitter_queries(runner, config, python_command, root), {
         require_namespaces = runner == "unittest",
       })
 
