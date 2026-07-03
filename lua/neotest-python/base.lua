@@ -1,6 +1,5 @@
 local nio = require("nio")
 local lib = require("neotest.lib")
-local Path = require("plenary.path")
 
 local M = {}
 
@@ -8,7 +7,7 @@ function M.is_test_file(file_path)
   if not vim.endswith(file_path, ".py") then
     return false
   end
-  local elems = vim.split(file_path, Path.path.sep)
+  local elems = vim.split(file_path, lib.files.sep)
   local file_name = elems[#elems]
   return vim.startswith(file_name, "test_") or vim.endswith(file_name, "_test.py")
 end
@@ -35,14 +34,14 @@ function M.get_python_command(root)
   end
   -- Use activated virtualenv.
   if vim.env.VIRTUAL_ENV then
-    python_command_mem[root] = { Path:new(vim.env.VIRTUAL_ENV, venv_bin, "python").filename }
+    python_command_mem[root] = { vim.fs.joinpath(vim.env.VIRTUAL_ENV, venv_bin, "python") }
     return python_command_mem[root]
   end
 
   for _, pattern in ipairs({ "*", ".*" }) do
-    local match = nio.fn.glob(Path:new(root or nio.fn.getcwd(), pattern, "pyvenv.cfg").filename)
+    local match = nio.fn.glob(vim.fs.joinpath(root or nio.fn.getcwd(), pattern, "pyvenv.cfg"))
     if match ~= "" then
-      python_command_mem[root] = { (Path:new(match):parent() / venv_bin / "python").filename }
+      python_command_mem[root] = { vim.fs.joinpath(vim.fs.dirname(match), venv_bin, "python") }
       return python_command_mem[root]
     end
   end
@@ -52,7 +51,7 @@ function M.get_python_command(root)
     if success and exit_code == 0 then
       local venv = data.stdout:gsub("\r?\n", "")
       if venv then
-        python_command_mem[root] = { Path:new(venv).filename }
+        python_command_mem[root] = { venv }
         return python_command_mem[root]
       end
     end
@@ -67,7 +66,7 @@ function M.get_python_command(root)
     if success and exit_code == 0 then
       local venv = data.stdout:gsub("\r?\n", "")
       if venv then
-        python_command_mem[root] = { Path:new(venv, venv_bin, "python").filename }
+        python_command_mem[root] = { vim.fs.joinpath(venv, venv_bin, "python") }
         return python_command_mem[root]
       end
     end
@@ -80,7 +79,7 @@ function M.get_python_command(root)
       { stdout = true }
     )
     if success and exit_code == 0 then
-      python_command_mem[root] = { Path:new(data).filename }
+      python_command_mem[root] = { data }
       return python_command_mem[root]
     end
   end
@@ -111,7 +110,8 @@ end
 local function scan_test_function_pattern(runner, config, python_command)
   local test_function_pattern = "^test"
   if runner == "pytest" and config.pytest_discovery then
-    local cmd = vim.iter({ python_command, M.get_script_path(), "--pytest-extract-test-name-template" }):flatten():totable()
+    local cmd = vim.iter({ python_command, M.get_script_path(), "--pytest-extract-test-name-template" }):flatten()
+        :totable()
     local _, data = lib.process.run(cmd, { stdout = true, stderr = true })
 
     for line in vim.gsplit(data.stdout, "\n", true) do
@@ -162,7 +162,7 @@ M.treesitter_queries = function(runner, config, python_command)
 end
 
 M.get_root =
-  lib.files.match_root_pattern("pyproject.toml", "setup.cfg", "mypy.ini", "pytest.ini", "setup.py")
+    lib.files.match_root_pattern("pyproject.toml", "setup.cfg", "mypy.ini", "pytest.ini", "setup.py")
 
 function M.create_dap_config(python_path, script_path, script_args, dap_args)
   return vim.tbl_extend("keep", {
@@ -188,13 +188,13 @@ function M.get_runner(python_path)
     return "unittest"
   end
   if
-    vim_test_runner and lib.func_util.index({ "unittest", "pytest", "django" }, vim_test_runner)
+      vim_test_runner and lib.func_util.index({ "unittest", "pytest", "django" }, vim_test_runner)
   then
     return vim_test_runner
   end
   local runner = M.module_exists("pytest", python_path) and "pytest"
-    or M.module_exists("django", python_path) and "django"
-    or "unittest"
+      or M.module_exists("django", python_path) and "django"
+      or "unittest"
   stored_runners[command_str] = runner
   return runner
 end
