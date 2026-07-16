@@ -1,4 +1,5 @@
 import json
+import os
 import re
 from io import StringIO
 from pathlib import Path
@@ -215,6 +216,9 @@ class NeotestDebugpyPlugin:
 
         excinfo: A (type(e), e, e.__traceback__) tuple. See sys.exc_info()
         """
+        if os.getenv("NEOTEST_PYTHON_DISABLE_POSTMORTEM") == "1":
+            return
+
         # Reference: https://github.com/microsoft/debugpy/issues/723
         import threading
 

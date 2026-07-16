@@ -2,9 +2,13 @@
 
 PYTHON_DIR="rplugin/python3/ultest"
 
+echo "Running Python tests..."
 pytest \
     --cov-branch \
     --cov=${PYTHON_DIR} \
     --cov-report xml:coverage/coverage.xml \
     --cov-report term \
     --cov-report html:coverage
+
+echo "\nRunning Lua tests..."
+nvim --headless -u NONE --cmd "set runtimepath+=." -c "luafile tests/run.lua" -c "qa!"
