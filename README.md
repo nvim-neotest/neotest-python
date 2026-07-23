@@ -123,3 +123,40 @@ require("neotest-python")({
   end,
 })
 ```
+
+`python`, `path_mappings`, and `env` are called on every `discover_positions`
+(i.e. on most buffer parses of a test file, not just on run), so cache
+anything non-trivial keyed by `root` rather than recomputing it per call. This
+matters in particular if you derive the command from a `docker-compose.yml`
+instead of hardcoding a service name:
+
+```lua
+local compose_cache = {}
+local function compose_content(root)
+  if compose_cache[root] == nil then
+    local handle = io.open(root .. "/compose.yaml", "r")
+    compose_cache[root] = handle and handle:read("*a") or false
+    if handle then
+      handle:close()
+    end
+  end
+  return compose_cache[root] or nil
+end
+
+-- e.g. a monorepo where each service's compose entry is named after its
+-- directory: derive the service instead of maintaining a lookup table that
+-- has to be updated by hand every time a service is added.
+require("neotest-python")({
+  python = function(root)
+    local service = root:match("([^/]+)$")
+    local content = compose_content(root)
+    if content and content:find("\n  " .. service .. ":", 1, true) then
+      return { "docker", "compose", "exec", "-T", "-w", "/app", service, "python" }
+    end
+    return { "python" }
+  end,
+  path_mappings = function(root)
+    return { [root] = "/app" }
+  end,
+})
+```
