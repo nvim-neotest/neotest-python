@@ -72,7 +72,7 @@ local function discover_params(python, script, path, positions, root, mappings)
     local param_index = string.find(line, "[", nil, true)
     if param_index then
       local test_id = root .. lib.files.path.sep .. string.sub(line, 1, param_index - 1)
-      test_id = path_mapping.to_host_path(test_id, mappings)
+      test_id = path_mapping.to_host(test_id, mappings)
       local param_id = string.sub(line, param_index + 1, #line - 1)
 
       if positions:get_key(test_id) then
@@ -96,7 +96,7 @@ end
 ---@param root string
 ---@param mappings table<string, string>
 function M.augment_positions(python, script, path, positions, root, mappings)
-  local host_path = path_mapping.to_host_path(path, mappings)
+  local host_path = path_mapping.to_host(path, mappings)
   if has_parametrize(host_path) then
     local test_params = discover_params(python, script, path, positions, root, mappings)
     add_test_instances(positions, test_params)

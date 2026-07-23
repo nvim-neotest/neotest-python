@@ -1,14 +1,23 @@
 #!/bin/sh
 
-PYTHON_DIR="rplugin/python3/ultest"
+set -e
+
+PYTHON_DIR="neotest_python"
 
 echo "Running Python tests..."
+pytest_status=0
 pytest \
     --cov-branch \
     --cov=${PYTHON_DIR} \
     --cov-report xml:coverage/coverage.xml \
     --cov-report term \
-    --cov-report html:coverage
+    --cov-report html:coverage \
+    || pytest_status=$?
+if [ "$pytest_status" -eq 5 ]; then
+    echo "No Python tests collected."
+elif [ "$pytest_status" -ne 0 ]; then
+    exit "$pytest_status"
+fi
 
-echo "\nRunning Lua tests..."
+printf "\nRunning Lua tests...\n"
 nvim --headless -u NONE --cmd "set runtimepath+=." -c "luafile tests/run.lua" -c "qa!"

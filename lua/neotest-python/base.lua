@@ -1,34 +1,57 @@
 local nio = require("nio")
 local lib = require("neotest.lib")
 local Path = require("plenary.path")
+local path_mapping = require("neotest-python.path_mapping")
 
 local M = {}
 local script_path_mem
 
----@param mappings { forward: table<string, string>, forward_keys?: string[] }|table<string, string>|nil
----@return { localRoot: string, remoteRoot: string }[]
-function M.get_dap_path_mappings(mappings)
-  local forward = mappings and mappings.forward or mappings or {}
-  local keys = mappings and mappings.forward_keys or {}
-  local path_mappings = {}
+local function copy_file(source, target)
+  lib.files.write(target, lib.files.read(source))
+end
 
-  if vim.tbl_isempty(keys) then
-    for local_root in pairs(forward) do
-      table.insert(keys, local_root)
+local function copy_dir(source, target)
+  nio.fn.mkdir(target, "p")
+
+  local scanner = vim.loop.fs_scandir(source)
+  while scanner do
+    local name, kind = vim.loop.fs_scandir_next(scanner)
+    if not name then
+      break
     end
-    table.sort(keys, function(a, b)
-      return #a > #b
-    end)
+
+    local source_path = source .. lib.files.sep .. name
+    local target_path = target .. lib.files.sep .. name
+    if kind == "directory" and name ~= "__pycache__" then
+      copy_dir(source_path, target_path)
+    elseif kind == "file" and vim.endswith(name, ".py") then
+      copy_file(source_path, target_path)
+    end
+  end
+end
+
+local function remove_dir(path)
+  local uv = vim.uv or vim.loop
+  local scanner = uv.fs_scandir(path)
+  if not scanner then
+    return
   end
 
-  for _, local_root in ipairs(keys) do
-    path_mappings[#path_mappings + 1] = {
-      localRoot = local_root,
-      remoteRoot = forward[local_root],
-    }
+  while true do
+    local name, kind = uv.fs_scandir_next(scanner)
+    if not name then
+      break
+    end
+
+    local child_path = path .. lib.files.sep .. name
+    if kind == "directory" then
+      remove_dir(child_path)
+    else
+      pcall(uv.fs_unlink, child_path)
+    end
   end
 
-  return path_mappings
+  pcall(uv.fs_rmdir, path)
 end
 
 function M.is_test_file(file_path)
@@ -127,6 +150,7 @@ function M.get_script_path()
 
   local paths = vim.api.nvim_get_runtime_file("neotest.py", true)
   for _, path in ipairs(paths) do
+    path = vim.fn.fnamemodify(path, ":p")
     if vim.endswith(path, ("neotest-python%sneotest.py"):format(lib.files.sep)) then
       script_path_mem = path
       return script_path_mem
@@ -136,6 +160,29 @@ function M.get_script_path()
   error("neotest.py not found")
 end
 
+---@param root string
+---@return string script_path
+---@return string runtime_dir
+function M.copy_runtime(root)
+  local runtime_source = Path:new(M.get_script_path()):parent().filename
+  local runtime_dir =
+    Path:new(root, ".neotest-python-" .. nio.fn.tempname():match("[^/]+$")).filename
+
+  nio.fn.mkdir(runtime_dir, "p")
+  copy_file(
+    Path:new(runtime_source, "neotest.py").filename,
+    Path:new(runtime_dir, "neotest.py").filename
+  )
+  copy_dir(
+    Path:new(runtime_source, "neotest_python").filename,
+    Path:new(runtime_dir, "neotest_python").filename
+  )
+
+  return Path:new(runtime_dir, "neotest.py").filename, runtime_dir
+end
+
+M.remove_dir = remove_dir
+
 ---@param python_command string[]
 ---@param config neotest-python._AdapterConfig
 ---@param runner string
@@ -143,7 +190,11 @@ end
 local function scan_test_function_pattern(runner, config, python_command)
   local test_function_pattern = "^test"
   if runner == "pytest" and config.pytest_discovery then
-    local cmd = vim.tbl_flatten({ python_command, M.get_script_path(), "--pytest-extract-test-name-template" })
+    local cmd = vim.tbl_flatten({
+      python_command,
+      M.get_script_path(),
+      "--pytest-extract-test-name-template",
+    })
     local _, data = lib.process.run(cmd, { stdout = true, stderr = true })
 
     for line in vim.gsplit(data.stdout, "\n", true) do
@@ -162,7 +213,8 @@ end
 ---@return string
 M.treesitter_queries = function(runner, config, python_command)
   local test_function_pattern = scan_test_function_pattern(runner, config, python_command)
-  return string.format([[
+  return string.format(
+    [[
     ;; Match undecorated functions
     ((function_definition
       name: (identifier) @test.name)
@@ -190,7 +242,10 @@ M.treesitter_queries = function(runner, config, python_command)
       @namespace.definition
      (#not-has-parent? @namespace.definition decorated_definition)
     )
-  ]], test_function_pattern, test_function_pattern)
+  ]],
+    test_function_pattern,
+    test_function_pattern
+  )
 end
 
 M.get_root =
@@ -223,7 +278,7 @@ function M.create_dap_config(python_path, script_path, script_args, cwd, env, da
     dap_config.program = nil
     dap_config.args = nil
     if not dap_config.pathMappings and context.mappings then
-      dap_config.pathMappings = M.get_dap_path_mappings(context.mappings)
+      dap_config.pathMappings = path_mapping.to_dap_path_mappings(context.mappings)
     end
   end
 

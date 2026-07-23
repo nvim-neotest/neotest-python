@@ -1,5 +1,7 @@
-package.loaded["neotest.logging"] = {
-  debug = function() end,
+package.loaded["nio"] = {
+  fn = {
+    tempname = vim.fn.tempname,
+  },
 }
 
 local path_mapping = require("neotest-python.path_mapping")
@@ -22,41 +24,38 @@ local function join_path(root, suffix)
 end
 
 local cwd = vim.fn.resolve(vim.fn.getcwd())
-local temp_root = vim.fn.resolve(vim.env.TMPDIR or (vim.uv or vim.loop).os_tmpdir() or "/tmp")
 
-local mappings = path_mapping.normalize_mappings({
+local mappings = path_mapping.normalize({
   [cwd] = "/workspace",
-  ["/tmp"] = "/tmp",
 })
 
 assert_equal(
-  path_mapping.to_container_path(join_path(cwd, "lua/neotest-python/adapter.lua"), mappings),
+  path_mapping.to_remote(join_path(cwd, "lua/neotest-python/adapter.lua"), mappings),
   "/workspace/lua/neotest-python/adapter.lua",
-  "project paths should translate to the container root"
+  "project paths should translate to the remote root"
 )
 
 assert_equal(
-  path_mapping.to_container_path(
-    join_path(temp_root, "neotest-python/results.json"),
-    mappings
-  ),
-  "/tmp/neotest-python/results.json",
-  "resolved temp paths should translate via the /tmp mapping"
+  path_mapping.to_host("/workspace/lua/neotest-python/adapter.lua", mappings),
+  join_path(cwd, "lua/neotest-python/adapter.lua"),
+  "remote paths should translate back to the host root"
 )
 
 assert_equal(
-  path_mapping.to_host_path("/tmp/neotest-python/results.json", mappings),
-  join_path(temp_root, "neotest-python/results.json"),
-  "container temp paths should translate back to the active host temp root"
-)
-
-assert_equal(
-  path_mapping.to_container_path(
+  path_mapping.to_remote(
     join_path(cwd, "lua/neotest-python/adapter.lua::TestAdapter::test_build_spec"),
     mappings
   ),
   "/workspace/lua/neotest-python/adapter.lua::TestAdapter::test_build_spec",
   "test node ids should preserve their suffix when translated"
+)
+
+assert_equal(
+  path_mapping
+    .to_remote(path_mapping.tempname(cwd, mappings), mappings)
+    :match("^/workspace/%.neotest%-python%-") ~= nil,
+  true,
+  "mapped temp files should live under the remote project root"
 )
 
 print("path_mapping tests passed")
