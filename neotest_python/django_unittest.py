@@ -12,7 +12,7 @@ from unittest.runner import TextTestResult
 from django import setup as django_setup
 from django.test.runner import DiscoverRunner
 
-from .base import NeotestAdapter, NeotestError, NeotestResultStatus
+from .base import NeotestAdapter, NeotestResultStatus
 
 
 class CaseUtilsMixin:
