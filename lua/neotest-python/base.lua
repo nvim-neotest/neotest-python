@@ -24,11 +24,11 @@ M.module_exists = function(module, python_command)
 end
 
 local python_command_mem = {}
-local venv_bin = vim.loop.os_uname().sysname:match("Windows") and "Scripts" or "bin"
+local venv_bin = vim.uv.os_uname().sysname:match("Windows") and "Scripts" or "bin"
 
 ---@return string[]
 function M.get_python_command(root)
-  root = root or vim.loop.cwd()
+  root = root or vim.uv.cwd()
   if python_command_mem[root] then
     return python_command_mem[root]
   end
