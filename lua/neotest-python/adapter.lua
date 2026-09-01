@@ -60,7 +60,7 @@ return function(config)
     end,
     is_test_file = config.is_test_file,
     discover_positions = function(path)
-      local root = base.get_root(path) or vim.loop.cwd() or ""
+      local root = base.get_root(path) or vim.uv.cwd() or ""
 
       local python_command = config.get_python_command(root)
       local runner = config.get_runner(python_command)
@@ -80,7 +80,7 @@ return function(config)
     build_spec = function(args)
       local position = args.tree:data()
 
-      local root = base.get_root(position.path) or vim.loop.cwd() or ""
+      local root = base.get_root(position.path) or vim.uv.cwd() or ""
 
       local python_command = config.get_python_command(root)
       local runner = config.get_runner(python_command)
